@@ -146,31 +146,31 @@ def get_certificate(
 
 @router.post("/transfer", status_code=status.HTTP_200_OK)
 def transfer_certificate(
-    code: str = None,
-    recipient_email: str = None,
-    message: str = None,
-    transfer_data: CertificateTransferCreate = None,
+    request_data: dict = Body(...),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Передача сертификата другому пользователю (по коду или ID)"""
     
     # Поддержка двух вариантов: по коду (для админки) или по ID (старый формат)
+    code = request_data.get('code')
+    recipient_email = request_data.get('recipient_email')
+    message = request_data.get('message')
+    
     if code:
         # Новый формат - передача по коду (для админки при создании)
         certificate = db.query(Certificate).filter(Certificate.code == code).first()
         to_email = recipient_email
-    elif transfer_data:
+    elif 'certificate_id' in request_data:
         # Старый формат - передача по ID
         certificate = db.query(Certificate).filter(
-            Certificate.id == transfer_data.certificate_id
+            Certificate.id == request_data['certificate_id']
         ).first()
-        to_email = transfer_data.to_user_email
-        message = transfer_data.message
+        to_email = request_data.get('to_user_email')
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Необходимо указать код сертификата или transfer_data"
+            detail="Необходимо указать код сертификата (code) или ID (certificate_id)"
         )
     
     if not certificate:
