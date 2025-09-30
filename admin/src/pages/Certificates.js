@@ -117,9 +117,10 @@ export default function Certificates() {
           });
         } catch (transferError) {
           console.error('Ошибка передачи сертификата:', transferError);
+          const errorMessage = transferError.response?.data?.detail || transferError.message || 'Неизвестная ошибка';
           setSnackbar({
             open: true,
-            message: `Сертификат ${certCode} создан, но не удалось отправить: ${transferError.response?.data?.detail || 'ошибка'}`,
+            message: `Сертификат ${certCode} создан, но не удалось отправить: ${errorMessage}`,
             severity: 'warning',
           });
         }

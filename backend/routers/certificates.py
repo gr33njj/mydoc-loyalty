@@ -146,15 +146,32 @@ def get_certificate(
 
 @router.post("/transfer", status_code=status.HTTP_200_OK)
 def transfer_certificate(
-    transfer_data: CertificateTransferCreate,
+    code: str = None,
+    recipient_email: str = None,
+    message: str = None,
+    transfer_data: CertificateTransferCreate = None,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Передача сертификата другому пользователю"""
+    """Передача сертификата другому пользователю (по коду или ID)"""
     
-    certificate = db.query(Certificate).filter(
-        Certificate.id == transfer_data.certificate_id
-    ).first()
+    # Поддержка двух вариантов: по коду (для админки) или по ID (старый формат)
+    if code:
+        # Новый формат - передача по коду (для админки при создании)
+        certificate = db.query(Certificate).filter(Certificate.code == code).first()
+        to_email = recipient_email
+    elif transfer_data:
+        # Старый формат - передача по ID
+        certificate = db.query(Certificate).filter(
+            Certificate.id == transfer_data.certificate_id
+        ).first()
+        to_email = transfer_data.to_user_email
+        message = transfer_data.message
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Необходимо указать код сертификата или transfer_data"
+        )
     
     if not certificate:
         raise HTTPException(
@@ -162,12 +179,13 @@ def transfer_certificate(
             detail="Сертификат не найден"
         )
     
-    # Проверка владения
-    if certificate.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Вы не являетесь владельцем этого сертификата"
-        )
+    # Проверка владения - пропускаем для админов и кассиров, или если сертификат без владельца
+    if current_user.role not in ["admin", "cashier"]:
+        if certificate.owner_id and certificate.owner_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Вы не являетесь владельцем этого сертификата"
+            )
     
     # Проверка статуса
     if certificate.status != CertificateStatus.ACTIVE:
@@ -177,20 +195,20 @@ def transfer_certificate(
         )
     
     # Поиск получателя
-    recipient = db.query(User).filter(User.email == transfer_data.to_user_email).first()
+    recipient = db.query(User).filter(User.email == to_email).first()
     
     if not recipient:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Получатель не найден"
+            detail=f"Получатель с email {to_email} не найден"
         )
     
     # Запись передачи
     transfer = CertificateTransfer(
         certificate_id=certificate.id,
-        from_user_id=current_user.id,
+        from_user_id=certificate.owner_id or current_user.id,
         to_user_id=recipient.id,
-        message=transfer_data.message
+        message=message
     )
     db.add(transfer)
     
@@ -211,7 +229,7 @@ def transfer_certificate(
     
     db.commit()
     
-    logger.info(f"Сертификат {certificate.code} передан от {current_user.email} к {recipient.email}")
+    logger.info(f"Сертификат {certificate.code} передан к {recipient.email}")
     
     # TODO: Отправка уведомления получателю
     
