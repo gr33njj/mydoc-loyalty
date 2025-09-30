@@ -30,24 +30,22 @@ export default function Dashboard() {
   const fetchStats = async () => {
     try {
       // Получаем статистику через API
-      const [usersRes] = await Promise.all([
-        axios.get('/admin/stats').catch(() => ({ data: null })),
-      ]);
+      const response = await axios.get('/admin/dashboard');
       
-      setStats(usersRes.data || {
-        total_users: 4,
-        active_certificates: 0,
-        total_points: 6500,
-        total_cashback: 2150,
+      setStats({
+        total_users: response.data.total_users,
+        active_certificates: response.data.active_certificates,
+        total_points: response.data.total_loyalty_points,
+        total_cashback: response.data.total_loyalty_cashback,
       });
     } catch (error) {
       console.error('Ошибка загрузки статистики:', error);
-      // Статистика по умолчанию
+      // Статистика по умолчанию при ошибке
       setStats({
-        total_users: 4,
+        total_users: 0,
         active_certificates: 0,
-        total_points: 6500,
-        total_cashback: 2150,
+        total_points: 0,
+        total_cashback: 0,
       });
     } finally {
       setLoading(false);

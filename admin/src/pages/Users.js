@@ -19,11 +19,12 @@ import {
 import { DataGrid } from '@mui/x-data-grid';
 import {
   Add as AddIcon,
-  Edit as EditIcon,
+  Refresh as RefreshIcon,
   AttachMoney as MoneyIcon,
 } from '@mui/icons-material';
 import Layout from '../components/Layout';
 import axios from 'axios';
+import { format } from 'date-fns';
 
 export default function Users() {
   const [users, setUsers] = useState([]);
@@ -41,59 +42,44 @@ export default function Users() {
   }, []);
 
   const fetchUsers = async () => {
+    setLoading(true);
     try {
-      // Для демонстрации используем тестовые данные
-      // В продакшене здесь будет реальный API запрос
-      const mockUsers = [
-        {
-          id: 1,
-          email: 'admin@it-mydoc.ru',
-          full_name: 'Администратор Системы',
-          phone: '+79991234567',
-          role: 'admin',
-          is_active: true,
-          created_at: '2025-09-30T07:41:51Z',
-          points_balance: 0,
-          cashback_balance: 0,
-        },
-        {
-          id: 2,
-          email: 'cashier@it-mydoc.ru',
-          full_name: 'Кассир Мария',
-          phone: '+79991234568',
-          role: 'cashier',
-          is_active: true,
-          created_at: '2025-09-30T07:41:51Z',
-          points_balance: 1200,
-          cashback_balance: 350.50,
-        },
-        {
-          id: 3,
-          email: 'doctor@it-mydoc.ru',
-          full_name: 'Доктор Иванов',
-          phone: '+79991234569',
-          role: 'doctor',
-          is_active: true,
-          created_at: '2025-09-30T07:41:51Z',
-          points_balance: 2800,
-          cashback_balance: 750.00,
-        },
-        {
-          id: 4,
-          email: 'patient@it-mydoc.ru',
-          full_name: 'Пациент Петров',
-          phone: '+79991234570',
-          role: 'patient',
-          is_active: true,
-          created_at: '2025-09-30T07:41:51Z',
-          points_balance: 2500,
-          cashback_balance: 1050.75,
-        },
-      ];
-      setUsers(mockUsers);
+      // Получаем пользователей из API
+      const response = await axios.get('/admin/users', {
+        params: { page: 1, page_size: 100 }
+      });
+      
+      // Получаем балансы для каждого пользователя
+      const usersWithBalances = await Promise.all(
+        response.data.users.map(async (user) => {
+          try {
+            const balanceRes = await axios.get(`/loyalty/balance/${user.id}`);
+            return {
+              ...user,
+              points_balance: balanceRes.data.points_balance || 0,
+              cashback_balance: balanceRes.data.cashback_balance || 0,
+              card_tier: balanceRes.data.card_tier || 'bronze',
+            };
+          } catch (error) {
+            console.error(`Ошибка получения баланса для пользователя ${user.id}:`, error);
+            return {
+              ...user,
+              points_balance: 0,
+              cashback_balance: 0,
+              card_tier: 'bronze',
+            };
+          }
+        })
+      );
+      
+      setUsers(usersWithBalances);
     } catch (error) {
       console.error('Ошибка загрузки пользователей:', error);
-      setSnackbar({ open: true, message: 'Ошибка загрузки пользователей', severity: 'error' });
+      setSnackbar({ 
+        open: true, 
+        message: error.response?.data?.detail || 'Ошибка загрузки пользователей', 
+        severity: 'error' 
+      });
     } finally {
       setLoading(false);
     }
@@ -102,6 +88,8 @@ export default function Users() {
   const handlePointsDialog = (user, action) => {
     setSelectedUser(user);
     setPointsAction(action);
+    setPointsAmount('');
+    setPointsReason('');
     setPointsDialogOpen(true);
   };
 
@@ -113,7 +101,7 @@ export default function Users() {
         user_id: selectedUser.id,
         points: parseFloat(pointsAmount),
         description: pointsReason,
-        idempotency_key: `admin-${Date.now()}`,
+        idempotency_key: `admin-${Date.now()}-${selectedUser.id}`,
       });
 
       setSnackbar({
@@ -125,6 +113,8 @@ export default function Users() {
       setPointsDialogOpen(false);
       setPointsAmount('');
       setPointsReason('');
+      
+      // Обновляем список пользователей
       fetchUsers();
     } catch (error) {
       console.error('Ошибка операции с баллами:', error);
@@ -173,7 +163,12 @@ export default function Users() {
         </Box>
       ),
     },
-    { field: 'phone', headerName: 'Телефон', width: 150 },
+    { 
+      field: 'phone', 
+      headerName: 'Телефон', 
+      width: 150,
+      renderCell: (params) => params.value || '—',
+    },
     {
       field: 'role',
       headerName: 'Роль',
@@ -219,9 +214,21 @@ export default function Users() {
       ),
     },
     {
+      field: 'created_at',
+      headerName: 'Регистрация',
+      width: 120,
+      renderCell: (params) => {
+        try {
+          return format(new Date(params.value), 'dd.MM.yyyy');
+        } catch {
+          return '—';
+        }
+      },
+    },
+    {
       field: 'actions',
       headerName: 'Действия',
-      width: 200,
+      width: 150,
       renderCell: (params) => (
         <Box sx={{ display: 'flex', gap: 1 }}>
           <Button
@@ -249,7 +256,7 @@ export default function Users() {
     (user) =>
       user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.phone.includes(searchTerm)
+      (user.phone && user.phone.includes(searchTerm))
   );
 
   return (
@@ -274,39 +281,60 @@ export default function Users() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid item xs={12} sm={2}>
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={fetchUsers}
+                disabled={loading}
+              >
+                Обновить
+              </Button>
+            </Grid>
+            <Grid item xs={12} sm={2}>
               <Button
                 fullWidth
                 variant="contained"
                 startIcon={<AddIcon />}
                 disabled
               >
-                Добавить пользователя
+                Добавить
               </Button>
             </Grid>
           </Grid>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent>
-          <Box sx={{ height: 600, width: '100%' }}>
-            <DataGrid
-              rows={filteredUsers}
-              columns={columns}
-              pageSize={10}
-              rowsPerPageOptions={[10, 25, 50]}
-              disableSelectionOnClick
-              loading={loading}
-              sx={{
-                '& .MuiDataGrid-cell': {
-                  padding: '8px',
-                },
-              }}
-            />
-          </Box>
-        </CardContent>
-      </Card>
+      {loading ? (
+        <Card>
+          <CardContent sx={{ textAlign: 'center', py: 8 }}>
+            <CircularProgress />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              Загрузка пользователей...
+            </Typography>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent>
+            <Box sx={{ height: 600, width: '100%' }}>
+              <DataGrid
+                rows={filteredUsers}
+                columns={columns}
+                pageSize={10}
+                rowsPerPageOptions={[10, 25, 50]}
+                disableSelectionOnClick
+                sx={{
+                  '& .MuiDataGrid-cell': {
+                    padding: '8px',
+                  },
+                }}
+              />
+            </Box>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Диалог начисления/списания баллов */}
       <Dialog open={pointsDialogOpen} onClose={() => setPointsDialogOpen(false)} maxWidth="sm" fullWidth>

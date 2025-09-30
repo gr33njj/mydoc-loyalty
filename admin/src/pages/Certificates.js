@@ -18,15 +18,18 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  CircularProgress,
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import {
   Add as AddIcon,
   Check as CheckIcon,
   QrCode as QrCodeIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import Layout from '../components/Layout';
 import axios from 'axios';
+import { format } from 'date-fns';
 
 export default function Certificates() {
   const [certificates, setCertificates] = useState([]);
@@ -35,6 +38,8 @@ export default function Certificates() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
   const [verifyCode, setVerifyCode] = useState('');
+  const [verifyResult, setVerifyResult] = useState(null);
+  const [creatingCert, setCreatingCert] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   // Форма создания сертификата
@@ -42,7 +47,6 @@ export default function Certificates() {
     amount: 5000,
     design: 'default',
     message: '',
-    owner_email: '',
   });
 
   useEffect(() => {
@@ -50,20 +54,28 @@ export default function Certificates() {
   }, []);
 
   const fetchCertificates = async () => {
+    setLoading(true);
     try {
-      // Для демонстрации - пустой массив
-      // В продакшене здесь будет реальный API запрос к /admin/certificates
-      setCertificates([]);
+      const response = await axios.get('/admin/certificates', {
+        params: { page: 1, page_size: 100 }
+      });
+      setCertificates(response.data.certificates || []);
     } catch (error) {
       console.error('Ошибка загрузки сертификатов:', error);
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.detail || 'Ошибка загрузки сертификатов',
+        severity: 'error',
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const handleCreateCertificate = async () => {
+    setCreatingCert(true);
     try {
-      await axios.post('/certificates/create', {
+      const response = await axios.post('/certificates/create', {
         initial_amount: newCert.amount,
         design_template: newCert.design,
         message: newCert.message,
@@ -71,12 +83,14 @@ export default function Certificates() {
 
       setSnackbar({
         open: true,
-        message: 'Сертификат успешно создан!',
+        message: `Сертификат ${response.data.code} успешно создан!`,
         severity: 'success',
       });
 
       setCreateDialogOpen(false);
-      setNewCert({ amount: 5000, design: 'default', message: '', owner_email: '' });
+      setNewCert({ amount: 5000, design: 'default', message: '' });
+      
+      // Обновляем список сертификатов
       fetchCertificates();
     } catch (error) {
       console.error('Ошибка создания сертификата:', error);
@@ -85,6 +99,8 @@ export default function Certificates() {
         message: error.response?.data?.detail || 'Ошибка создания сертификата',
         severity: 'error',
       });
+    } finally {
+      setCreatingCert(false);
     }
   };
 
@@ -94,16 +110,15 @@ export default function Certificates() {
         code: verifyCode,
       });
 
+      setVerifyResult(response.data);
       setSnackbar({
         open: true,
         message: `Сертификат действителен! Баланс: ${response.data.current_amount} ₽`,
         severity: 'success',
       });
-
-      setVerifyDialogOpen(false);
-      setVerifyCode('');
     } catch (error) {
       console.error('Ошибка проверки сертификата:', error);
+      setVerifyResult(null);
       setSnackbar({
         open: true,
         message: error.response?.data?.detail || 'Сертификат недействителен',
@@ -130,13 +145,32 @@ export default function Certificates() {
     return labels[status] || status;
   };
 
+  const getDesignLabel = (design) => {
+    const labels = {
+      default: 'Классический',
+      birthday: 'День рождения',
+      holiday: 'Праздничный',
+      wellness: 'Здоровье',
+    };
+    return labels[design] || design;
+  };
+
   const columns = [
-    { field: 'code', headerName: 'Код', width: 150, fontWeight: 'bold' },
+    { 
+      field: 'code', 
+      headerName: 'Код', 
+      width: 150,
+      renderCell: (params) => (
+        <Typography variant="body2" fontFamily="monospace" fontWeight="bold">
+          {params.value}
+        </Typography>
+      ),
+    },
     {
-      field: 'owner',
+      field: 'owner_id',
       headerName: 'Владелец',
-      width: 200,
-      renderCell: (params) => params.row.owner_email || 'Не указан',
+      width: 100,
+      renderCell: (params) => params.value ? `ID: ${params.value}` : 'Не назначен',
     },
     {
       field: 'initial_amount',
@@ -169,25 +203,41 @@ export default function Certificates() {
     {
       field: 'design_template',
       headerName: 'Дизайн',
-      width: 130,
+      width: 150,
+      renderCell: (params) => getDesignLabel(params.value),
     },
     {
-      field: 'created_at',
+      field: 'issued_at',
       headerName: 'Создан',
-      width: 150,
-      renderCell: (params) => new Date(params.value).toLocaleDateString('ru-RU'),
+      width: 120,
+      renderCell: (params) => {
+        try {
+          return format(new Date(params.value), 'dd.MM.yyyy');
+        } catch {
+          return '—';
+        }
+      },
     },
     {
       field: 'actions',
       headerName: 'Действия',
-      width: 150,
+      width: 100,
       renderCell: (params) => (
         <Button
           size="small"
           variant="outlined"
           startIcon={<QrCodeIcon />}
-          onClick={() => window.open(params.row.qr_code_url, '_blank')}
-          disabled={!params.row.qr_code_url}
+          onClick={() => {
+            if (params.row.qr_code_url) {
+              window.open(params.row.qr_code_url, '_blank');
+            } else {
+              setSnackbar({
+                open: true,
+                message: 'QR-код не доступен',
+                severity: 'warning',
+              });
+            }
+          }}
         >
           QR
         </Button>
@@ -222,13 +272,38 @@ export default function Certificates() {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} sm={6}>
+            <Grid item xs={12} sm={5}>
               <TextField
                 fullWidth
                 placeholder="Поиск по коду сертификата..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
+            </Grid>
+            <Grid item xs={12} sm={2}>
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={fetchCertificates}
+                disabled={loading}
+              >
+                Обновить
+              </Button>
+            </Grid>
+            <Grid item xs={12} sm={2}>
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<CheckIcon />}
+                onClick={() => {
+                  setVerifyCode('');
+                  setVerifyResult(null);
+                  setVerifyDialogOpen(true);
+                }}
+              >
+                Проверить
+              </Button>
             </Grid>
             <Grid item xs={12} sm={3}>
               <Button
@@ -240,21 +315,20 @@ export default function Certificates() {
                 Создать
               </Button>
             </Grid>
-            <Grid item xs={12} sm={3}>
-              <Button
-                fullWidth
-                variant="outlined"
-                startIcon={<CheckIcon />}
-                onClick={() => setVerifyDialogOpen(true)}
-              >
-                Проверить
-              </Button>
-            </Grid>
           </Grid>
         </CardContent>
       </Card>
 
-      {certificates.length === 0 ? (
+      {loading ? (
+        <Card>
+          <CardContent sx={{ textAlign: 'center', py: 8 }}>
+            <CircularProgress />
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              Загрузка сертификатов...
+            </Typography>
+          </CardContent>
+        </Card>
+      ) : certificates.length === 0 ? (
         <Card>
           <CardContent sx={{ textAlign: 'center', py: 8 }}>
             <Typography variant="h6" gutterBottom>
@@ -275,7 +349,6 @@ export default function Certificates() {
                 pageSize={10}
                 rowsPerPageOptions={[10, 25, 50]}
                 disableSelectionOnClick
-                loading={loading}
               />
             </Box>
           </CardContent>
@@ -283,7 +356,7 @@ export default function Certificates() {
       )}
 
       {/* Диалог создания сертификата */}
-      <Dialog open={createDialogOpen} onClose={() => setCreateDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={createDialogOpen} onClose={() => !creatingCert && setCreateDialogOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Создать подарочный сертификат</DialogTitle>
         <DialogContent>
           <Box sx={{ pt: 2 }}>
@@ -297,6 +370,7 @@ export default function Certificates() {
                   variant={newCert.amount === amount ? 'contained' : 'outlined'}
                   onClick={() => setNewCert({ ...newCert, amount })}
                   size="small"
+                  disabled={creatingCert}
                 >
                   {amount.toLocaleString()} ₽
                 </Button>
@@ -310,6 +384,7 @@ export default function Certificates() {
               value={newCert.amount}
               onChange={(e) => setNewCert({ ...newCert, amount: parseInt(e.target.value) || 0 })}
               sx={{ mb: 3 }}
+              disabled={creatingCert}
             />
 
             <FormControl fullWidth sx={{ mb: 3 }}>
@@ -318,6 +393,7 @@ export default function Certificates() {
                 value={newCert.design}
                 label="Дизайн сертификата"
                 onChange={(e) => setNewCert({ ...newCert, design: e.target.value })}
+                disabled={creatingCert}
               >
                 {designs.map((design) => (
                   <MenuItem key={design.value} value={design.value}>
@@ -335,13 +411,24 @@ export default function Certificates() {
               value={newCert.message}
               onChange={(e) => setNewCert({ ...newCert, message: e.target.value })}
               placeholder="Поздравительное сообщение..."
+              disabled={creatingCert}
             />
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCreateDialogOpen(false)}>Отмена</Button>
-          <Button onClick={handleCreateCertificate} variant="contained">
-            Создать за {newCert.amount.toLocaleString()} ₽
+          <Button onClick={() => setCreateDialogOpen(false)} disabled={creatingCert}>
+            Отмена
+          </Button>
+          <Button 
+            onClick={handleCreateCertificate} 
+            variant="contained" 
+            disabled={creatingCert || !newCert.amount}
+          >
+            {creatingCert ? (
+              <><CircularProgress size={20} sx={{ mr: 1 }} /> Создание...</>
+            ) : (
+              `Создать за ${newCert.amount.toLocaleString()} ₽`
+            )}
           </Button>
         </DialogActions>
       </Dialog>
@@ -359,13 +446,35 @@ export default function Certificates() {
               fullWidth
               label="Код сертификата"
               value={verifyCode}
-              onChange={(e) => setVerifyCode(e.target.value)}
+              onChange={(e) => setVerifyCode(e.target.value.toUpperCase())}
               placeholder="CERT-XXXXXXXX"
+              sx={{ mb: 2 }}
             />
+
+            {verifyResult && (
+              <Alert severity="success">
+                <Typography variant="subtitle2">Сертификат действителен!</Typography>
+                <Typography variant="body2">
+                  Код: <strong>{verifyResult.code}</strong>
+                </Typography>
+                <Typography variant="body2">
+                  Баланс: <strong>{verifyResult.current_amount} ₽</strong>
+                </Typography>
+                <Typography variant="body2">
+                  Статус: <strong>{getStatusLabel(verifyResult.status)}</strong>
+                </Typography>
+              </Alert>
+            )}
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setVerifyDialogOpen(false)}>Отмена</Button>
+          <Button onClick={() => {
+            setVerifyDialogOpen(false);
+            setVerifyCode('');
+            setVerifyResult(null);
+          }}>
+            Закрыть
+          </Button>
           <Button
             onClick={handleVerifyCertificate}
             variant="contained"
@@ -378,7 +487,7 @@ export default function Certificates() {
 
       <Snackbar
         open={snackbar.open}
-        autoHideDuration={3000}
+        autoHideDuration={4000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
       >
         <Alert severity={snackbar.severity} sx={{ width: '100%' }}>

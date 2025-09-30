@@ -24,11 +24,11 @@ router = APIRouter()
 
 
 def require_admin(current_user: User = Depends(get_current_active_user)):
-    """Проверка прав администратора"""
-    if current_user.role not in ["admin"]:
+    """Проверка прав администратора или кассира"""
+    if current_user.role not in ["admin", "cashier"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Требуются права администратора"
+            detail="Требуются права администратора или кассира"
         )
     return current_user
 
