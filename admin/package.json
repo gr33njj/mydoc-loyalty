@@ -16,7 +16,7 @@
     "react-scripts": "5.0.1",
     "recharts": "^2.10.3",
     "date-fns": "^2.30.0",
-    "react-qr-scanner": "^1.0.0-alpha.11"
+    "html5-qrcode": "^2.3.8"
   },
   "scripts": {
     "start": "react-scripts start",

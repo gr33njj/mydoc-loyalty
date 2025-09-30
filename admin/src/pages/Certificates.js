@@ -30,6 +30,7 @@ import {
   Send as SendIcon,
 } from '@mui/icons-material';
 import Layout from '../components/Layout';
+import QRScanner from '../components/QRScanner';
 import axios from 'axios';
 import { format } from 'date-fns';
 
@@ -49,6 +50,9 @@ export default function Certificates() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [scanDialogOpen, setScanDialogOpen] = useState(false);
   const [scanInput, setScanInput] = useState('');
+  const [useDialogOpen, setUseDialogOpen] = useState(false);
+  const [selectedCertForUse, setSelectedCertForUse] = useState(null);
+  const [useAmount, setUseAmount] = useState('');
 
   // Форма создания сертификата
   const [newCert, setNewCert] = useState({
@@ -178,21 +182,57 @@ export default function Certificates() {
     }
   };
 
-  const handleScanVerify = async () => {
-    if (!scanInput) return;
+  const handleScanSuccess = async (decodedText) => {
+    console.log('Отсканирован код:', decodedText);
+    
+    // Извлекаем код сертификата из QR
+    let certCode = decodedText;
+    if (decodedText.includes('CERT-')) {
+      const match = decodedText.match(/CERT-[A-Z0-9]+/);
+      if (match) certCode = match[0];
+    }
+    
+    setScanDialogOpen(false);
     
     try {
-      const response = await axios.post('/certificates/verify', { code: scanInput });
+      const response = await axios.post('/certificates/verify', { code: certCode });
       setVerifyResult(response.data);
-      setVerifyCode(scanInput);
-      setScanDialogOpen(false);
+      setVerifyCode(certCode);
       setVerifyDialogOpen(true);
-      setScanInput('');
     } catch (err) {
       console.error('Ошибка проверки:', err);
       setSnackbar({
         open: true,
         message: err.response?.data?.detail || 'Сертификат не найден',
+        severity: 'error',
+      });
+    }
+  };
+
+  const handleUseCertificate = async () => {
+    if (!selectedCertForUse || !useAmount) return;
+
+    try {
+      await axios.post('/certificates/use', {
+        code: selectedCertForUse.code,
+        amount: parseFloat(useAmount),
+      });
+
+      setSnackbar({
+        open: true,
+        message: `Сертификат погашен на ${useAmount} ₽`,
+        severity: 'success',
+      });
+
+      setUseDialogOpen(false);
+      setSelectedCertForUse(null);
+      setUseAmount('');
+      fetchCertificates();
+    } catch (error) {
+      console.error('Ошибка погашения сертификата:', error);
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.detail || 'Ошибка погашения сертификата',
         severity: 'error',
       });
     }
@@ -375,8 +415,8 @@ export default function Certificates() {
     <Layout>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
-          Управление сертификатами
-        </Typography>
+        Управление сертификатами
+      </Typography>
         <Typography variant="body1" color="text.secondary">
           Всего сертификатов: {certificates.length}
         </Typography>
@@ -385,36 +425,27 @@ export default function Certificates() {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} sm={5}>
+            <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
                 placeholder="Поиск по коду сертификата..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                size="small"
               />
             </Grid>
-            <Grid item xs={12} sm={2}>
-              <Button
-                fullWidth
-                variant="outlined"
-                startIcon={<RefreshIcon />}
-                onClick={fetchCertificates}
-                disabled={loading}
-              >
-                Обновить
-              </Button>
-            </Grid>
-            <Grid item xs={12} sm={2}>
+            <Grid item xs={6} sm={4} md={2}>
               <Button
                 fullWidth
                 variant="outlined"
                 startIcon={<QrCodeIcon />}
                 onClick={() => setScanDialogOpen(true)}
+                size="small"
               >
                 Сканировать
               </Button>
             </Grid>
-            <Grid item xs={12} sm={2}>
+            <Grid item xs={6} sm={4} md={2}>
               <Button
                 fullWidth
                 variant="outlined"
@@ -424,16 +455,30 @@ export default function Certificates() {
                   setVerifyResult(null);
                   setVerifyDialogOpen(true);
                 }}
+                size="small"
               >
                 Проверить
               </Button>
             </Grid>
-            <Grid item xs={12} sm={2}>
+            <Grid item xs={6} sm={4} md={2}>
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<RefreshIcon />}
+                onClick={fetchCertificates}
+                disabled={loading}
+                size="small"
+              >
+                Обновить
+              </Button>
+            </Grid>
+            <Grid item xs={6} sm={12} md={2}>
               <Button
                 fullWidth
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={() => setCreateDialogOpen(true)}
+                size="small"
               >
                 Создать
               </Button>
@@ -660,17 +705,39 @@ export default function Certificates() {
             />
 
             {verifyResult && (
-              <Alert severity="success">
-                <Typography variant="subtitle2">Сертификат действителен!</Typography>
+              <Alert 
+                severity={verifyResult.status === 'active' ? 'success' : 'warning'}
+                sx={{ mb: 2 }}
+              >
+                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                  {verifyResult.status === 'active' ? 'Сертификат действителен!' : 'Сертификат не активен'}
+                </Typography>
                 <Typography variant="body2">
                   Код: <strong>{verifyResult.code}</strong>
                 </Typography>
                 <Typography variant="body2">
-                  Баланс: <strong>{verifyResult.current_amount} ₽</strong>
+                  Баланс: <strong>{verifyResult.current_amount?.toFixed(2)} ₽</strong>
                 </Typography>
                 <Typography variant="body2">
                   Статус: <strong>{getStatusLabel(verifyResult.status)}</strong>
                 </Typography>
+                
+                {verifyResult.status === 'active' && verifyResult.current_amount > 0 && (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="small"
+                    sx={{ mt: 2 }}
+                    onClick={() => {
+                      setSelectedCertForUse(verifyResult);
+                      setUseAmount(verifyResult.current_amount.toString());
+                      setVerifyDialogOpen(false);
+                      setUseDialogOpen(true);
+                    }}
+                  >
+                    Погасить сертификат
+                  </Button>
+                )}
               </Alert>
             )}
           </Box>
@@ -694,36 +761,85 @@ export default function Certificates() {
       </Dialog>
 
       {/* Диалог сканирования QR-кода */}
-      <Dialog open={scanDialogOpen} onClose={() => setScanDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Сканировать QR-код сертификата</DialogTitle>
-        <DialogContent>
-          <Alert severity="info" sx={{ mb: 3 }}>
-            Отсканируйте QR-код сертификата или введите код вручную
-          </Alert>
-          <TextField
-            autoFocus
-            fullWidth
-            label="Код сертификата"
-            placeholder="CERT-XXXXXXXXXXXX"
-            value={scanInput}
-            onChange={(e) => setScanInput(e.target.value.toUpperCase())}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter') {
-                handleScanVerify();
-              }
-            }}
-            helperText="Отсканируйте QR-код или введите код вручную"
-            sx={{ mt: 2 }}
+      <Dialog 
+        open={scanDialogOpen} 
+        onClose={() => setScanDialogOpen(false)} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            m: { xs: 1, sm: 2 },
+            maxWidth: { xs: 'calc(100% - 16px)', sm: 600 }
+          }
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>Сканировать QR-код</DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <QRScanner 
+            onScanSuccess={handleScanSuccess}
+            onClose={() => setScanDialogOpen(false)}
           />
         </DialogContent>
+      </Dialog>
+
+      {/* Диалог погашения сертификата */}
+      <Dialog open={useDialogOpen} onClose={() => setUseDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Погасить сертификат</DialogTitle>
+        <DialogContent>
+          {selectedCertForUse && (
+            <>
+              <Alert severity="info" sx={{ mb: 3 }}>
+                <Typography variant="subtitle2">
+                  Код: {selectedCertForUse.code}
+                </Typography>
+                <Typography variant="body2">
+                  Доступный баланс: {selectedCertForUse.current_amount.toFixed(2)} ₽
+      </Typography>
+              </Alert>
+
+              <TextField
+                autoFocus
+                fullWidth
+                label="Сумма погашения"
+                type="number"
+                value={useAmount}
+                onChange={(e) => setUseAmount(e.target.value)}
+                inputProps={{ 
+                  min: 0, 
+                  max: selectedCertForUse.current_amount,
+                  step: 0.01 
+                }}
+                helperText={`Максимум: ${selectedCertForUse.current_amount.toFixed(2)} ₽`}
+                sx={{ mt: 2 }}
+              />
+
+              <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setUseAmount(selectedCertForUse.current_amount.toString())}
+                >
+                  Полностью
+                </Button>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setUseAmount((selectedCertForUse.current_amount / 2).toFixed(2))}
+                >
+                  Половина
+                </Button>
+              </Box>
+            </>
+          )}
+        </DialogContent>
         <DialogActions>
-          <Button onClick={() => setScanDialogOpen(false)}>Отмена</Button>
-          <Button 
-            onClick={handleScanVerify} 
+          <Button onClick={() => setUseDialogOpen(false)}>Отмена</Button>
+          <Button
+            onClick={handleUseCertificate}
             variant="contained"
-            disabled={!scanInput}
+            disabled={!useAmount || parseFloat(useAmount) <= 0}
           >
-            Проверить
+            Погасить
           </Button>
         </DialogActions>
       </Dialog>
