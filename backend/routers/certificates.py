@@ -275,7 +275,12 @@ def verify_certificate(
         )
     
     # Проверка срока действия
-    if datetime.utcnow() > certificate.valid_until:
+    now = datetime.now(timezone.utc)
+    valid_until = certificate.valid_until
+    if valid_until.tzinfo is None:
+        valid_until = valid_until.replace(tzinfo=timezone.utc)
+    
+    if now > valid_until:
         certificate.status = CertificateStatus.EXPIRED
         db.commit()
         return CertificateVerifyResponse(
