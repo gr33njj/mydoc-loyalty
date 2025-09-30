@@ -105,8 +105,8 @@ class TransactionHistoryResponse(BaseModel):
 
 class CertificateCreate(BaseModel):
     initial_amount: float
-    valid_until: datetime
-    owner_id: int
+    valid_until: Optional[datetime] = None  # Опционально, по умолчанию +1 год
+    owner_id: Optional[int] = None  # Опционально, может быть без владельца
     message: Optional[str] = None
     design_template: str = "default"
     

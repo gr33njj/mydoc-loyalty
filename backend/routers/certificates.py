@@ -63,14 +63,19 @@ def create_certificate(
     # Генерация уникального кода
     code = generate_certificate_code()
     
+    # Автоматическая генерация valid_until если не указано (по умолчанию +1 год)
+    valid_until = cert_data.valid_until
+    if valid_until is None:
+        valid_until = datetime.utcnow() + timedelta(days=365)
+    
     # Создание сертификата
     certificate = Certificate(
         code=code,
         initial_amount=cert_data.initial_amount,
         current_amount=cert_data.initial_amount,
-        owner_id=cert_data.owner_id,
+        owner_id=cert_data.owner_id,  # Может быть None
         issued_by_id=current_user.id,
-        valid_until=cert_data.valid_until,
+        valid_until=valid_until,
         design_template=cert_data.design_template,
         message=cert_data.message,
         status=CertificateStatus.ACTIVE
