@@ -7,6 +7,8 @@ import {
   TextField,
   Button,
   Typography,
+  Alert,
+  CircularProgress,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -15,14 +17,25 @@ import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (login(email, password)) {
+    setError('');
+    setLoading(true);
+
+    const result = await login(email, password);
+    
+    if (result.success) {
       navigate('/');
+    } else {
+      setError(result.error);
     }
+
+    setLoading(false);
   };
 
   return (
@@ -48,6 +61,16 @@ export default function Login() {
               </Typography>
             </Box>
 
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+            )}
+
+            <Alert severity="info" sx={{ mb: 3 }}>
+              Доступ только для администраторов и кассиров
+            </Alert>
+
             <form onSubmit={handleSubmit}>
               <TextField
                 fullWidth
@@ -57,6 +80,8 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 margin="normal"
+                disabled={loading}
+                placeholder="admin@it-mydoc.ru"
               />
               
               <TextField
@@ -67,6 +92,7 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 margin="normal"
+                disabled={loading}
               />
 
               <Button
@@ -75,10 +101,23 @@ export default function Login() {
                 variant="contained"
                 size="large"
                 sx={{ mt: 3 }}
+                disabled={loading}
               >
-                Войти
+                {loading ? <CircularProgress size={24} /> : 'Войти'}
               </Button>
             </form>
+
+            <Box sx={{ mt: 3, p: 2, bgcolor: '#e5eef2', borderRadius: 2 }}>
+              <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
+                <strong>Тестовые учетные данные:</strong>
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block">
+                • admin@it-mydoc.ru / admin123
+              </Typography>
+              <Typography variant="caption" color="text.secondary" display="block">
+                • cashier@it-mydoc.ru / cashier123
+              </Typography>
+            </Box>
           </CardContent>
         </Card>
       </Container>
