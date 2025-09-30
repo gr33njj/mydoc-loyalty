@@ -114,6 +114,27 @@ def create_certificate(
     return response
 
 
+@router.get("/my", response_model=List[CertificateResponse])
+def get_my_certificates(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Получение списка сертификатов текущего пользователя"""
+    
+    certificates = db.query(Certificate).filter(
+        Certificate.owner_id == current_user.id
+    ).order_by(Certificate.created_at.desc()).all()
+    
+    responses = []
+    for cert in certificates:
+        response = CertificateResponse.from_orm(cert)
+        if cert.qr_code_path:
+            response.qr_code_url = f"https://{settings.DOMAIN}/qrcodes/{cert.code}.png"
+        responses.append(response)
+    
+    return responses
+
+
 @router.get("/{certificate_id}", response_model=CertificateResponse)
 def get_certificate(
     certificate_id: int,

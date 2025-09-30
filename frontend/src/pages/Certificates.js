@@ -71,12 +71,11 @@ export default function Certificates() {
 
   const fetchCertificates = async () => {
     try {
-      // TODO: Реализовать API endpoint для получения сертификатов пользователя
-      // const response = await axios.get('/certificates/my');
-      // setCertificates(response.data);
-      setCertificates([]);
+      const response = await axios.get('/certificates/my');
+      setCertificates(response.data);
     } catch (error) {
       console.error('Ошибка загрузки сертификатов:', error);
+      setCertificates([]);
     } finally {
       setLoading(false);
     }
