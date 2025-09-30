@@ -198,17 +198,19 @@ export default function Certificates() {
       const response = await axios.post('/certificates/verify', { code: certCode });
       console.log('Ответ проверки:', response.data);
       
-      // Убедимся что у нас есть все поля
-      const certData = {
-        ...response.data,
-        code: response.data.code || certCode,
-        current_amount: response.data.current_amount || 0,
-        status: response.data.status || 'unknown'
-      };
-      
-      setVerifyResult(certData);
+      // Используем полученный ответ как есть
+      setVerifyResult(response.data);
       setVerifyCode(certCode);
       setVerifyDialogOpen(true);
+      
+      // Если сертификат валидный и активный - предложить погасить
+      if (response.data.valid && response.data.certificate?.status === 'active') {
+        setSnackbar({
+          open: true,
+          message: `Сертификат найден! Баланс: ${response.data.certificate.current_amount.toFixed(2)} ₽`,
+          severity: 'success',
+        });
+      }
     } catch (err) {
       console.error('Ошибка проверки:', err);
       console.error('Детали ошибки:', err.response?.data);
@@ -717,37 +719,43 @@ export default function Certificates() {
 
             {verifyResult && (
               <Alert 
-                severity={verifyResult.status === 'active' ? 'success' : 'warning'}
+                severity={verifyResult.valid === false ? 'error' : 'success'}
                 sx={{ mb: 2 }}
               >
                 <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
-                  {verifyResult.status === 'active' ? 'Сертификат действителен!' : 'Сертификат не активен'}
-                </Typography>
-                <Typography variant="body2">
-                  Код: <strong>{verifyResult.code}</strong>
-                </Typography>
-                <Typography variant="body2">
-                  Баланс: <strong>{verifyResult.current_amount?.toFixed(2)} ₽</strong>
-                </Typography>
-                <Typography variant="body2">
-                  Статус: <strong>{getStatusLabel(verifyResult.status)}</strong>
+                  {verifyResult.valid ? 'Сертификат действителен!' : verifyResult.message}
                 </Typography>
                 
-                {verifyResult.status === 'active' && verifyResult.current_amount > 0 && (
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    size="small"
-                    sx={{ mt: 2 }}
-                    onClick={() => {
-                      setSelectedCertForUse(verifyResult);
-                      setUseAmount(verifyResult.current_amount.toString());
-                      setVerifyDialogOpen(false);
-                      setUseDialogOpen(true);
-                    }}
-                  >
-                    Погасить сертификат
-                  </Button>
+                {verifyResult.certificate && (
+                  <>
+                    <Typography variant="body2">
+                      Код: <strong>{verifyResult.certificate.code}</strong>
+                    </Typography>
+                    <Typography variant="body2">
+                      Баланс: <strong>{verifyResult.certificate.current_amount?.toFixed(2) || '0.00'} ₽</strong>
+                    </Typography>
+                    <Typography variant="body2">
+                      Статус: <strong>{getStatusLabel(verifyResult.certificate.status)}</strong>
+                    </Typography>
+                    
+                    {verifyResult.valid && verifyResult.certificate.status === 'active' && verifyResult.certificate.current_amount > 0 && (
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        size="small"
+                        sx={{ mt: 2 }}
+                        fullWidth
+                        onClick={() => {
+                          setSelectedCertForUse(verifyResult.certificate);
+                          setUseAmount(verifyResult.certificate.current_amount.toString());
+                          setVerifyDialogOpen(false);
+                          setUseDialogOpen(true);
+                        }}
+                      >
+                        Погасить сертификат
+                      </Button>
+                    )}
+                  </>
                 )}
               </Alert>
             )}

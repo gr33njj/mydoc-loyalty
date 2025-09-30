@@ -50,13 +50,11 @@ export default function QRScanner({ onScanSuccess, onClose }) {
       setError(null);
       setScanning(true);
 
-      const camId = await getCameras();
-      setCameraId(camId);
-
       html5QrCodeRef.current = new Html5Qrcode("qr-reader");
 
+      // Используем facingMode вместо выбора камеры по ID
       await html5QrCodeRef.current.start(
-        camId,
+        { facingMode: "environment" }, // Задняя камера
         {
           fps: 10,
           qrbox: { width: 250, height: 250 },
