@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List
 import qrcode
 import secrets
@@ -348,7 +348,12 @@ def redeem_certificate(
         )
     
     # Проверка срока действия
-    if datetime.utcnow() > certificate.valid_until:
+    now = datetime.now(timezone.utc)
+    valid_until = certificate.valid_until
+    if valid_until.tzinfo is None:
+        valid_until = valid_until.replace(tzinfo=timezone.utc)
+    
+    if now > valid_until:
         certificate.status = CertificateStatus.EXPIRED
         db.commit()
         raise HTTPException(
