@@ -40,6 +40,8 @@ export default function Certificates() {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [tabValue, setTabValue] = useState(0);
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [selectedCertForQr, setSelectedCertForQr] = useState(null);
 
   // Форма покупки
   const [buyForm, setBuyForm] = useState({
@@ -124,6 +126,11 @@ export default function Certificates() {
     setSelectedCertificate(certificate);
     setTransferForm({ email: '', message: '' });
     setTransferDialogOpen(true);
+  };
+
+  const openQrDialog = (certificate) => {
+    setSelectedCertForQr(certificate);
+    setQrDialogOpen(true);
   };
 
   const getStatusColor = (status) => {
@@ -239,7 +246,7 @@ export default function Certificates() {
                             variant="outlined"
                             size="small"
                             startIcon={<QrCode2Icon />}
-                            onClick={() => window.open(cert.qr_code_url, '_blank')}
+                            onClick={() => openQrDialog(cert)}
                           >
                             QR-код
                           </Button>
@@ -393,6 +400,64 @@ export default function Certificates() {
           <Button onClick={handleTransfer} variant="contained" startIcon={<SendIcon />}>
             Передать
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Диалог отображения QR-кода */}
+      <Dialog open={qrDialogOpen} onClose={() => setQrDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ textAlign: 'center', fontWeight: 'bold' }}>
+          QR-код сертификата
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ textAlign: 'center', py: 3 }}>
+            {selectedCertForQr && (
+              <>
+                <Box sx={{ 
+                  display: 'inline-block', 
+                  p: 3, 
+                  bgcolor: 'white', 
+                  borderRadius: 2,
+                  boxShadow: 3
+                }}>
+                  <img 
+                    src={selectedCertForQr.qr_code_url} 
+                    alt="QR Code" 
+                    style={{ 
+                      width: '100%', 
+                      maxWidth: '300px', 
+                      height: 'auto',
+                      display: 'block'
+                    }} 
+                  />
+                </Box>
+                <Typography variant="h6" sx={{ mt: 3, fontWeight: 'bold', color: 'primary.main' }}>
+                  {selectedCertForQr.code}
+                </Typography>
+                <Typography variant="body1" sx={{ mt: 1 }}>
+                  Номинал: {selectedCertForQr.initial_amount.toFixed(0)} ₽
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Покажите этот QR-код на кассе для оплаты
+                </Typography>
+              </>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setQrDialogOpen(false)}>Закрыть</Button>
+          {selectedCertForQr && (
+            <Button 
+              variant="contained" 
+              onClick={() => {
+                const link = document.createElement('a');
+                link.href = selectedCertForQr.qr_code_url;
+                link.download = `${selectedCertForQr.code}.png`;
+                link.click();
+              }}
+            >
+              Скачать
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 

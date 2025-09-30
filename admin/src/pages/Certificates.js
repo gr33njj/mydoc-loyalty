@@ -47,6 +47,8 @@ export default function Certificates() {
   const [verifyResult, setVerifyResult] = useState(null);
   const [creatingCert, setCreatingCert] = useState(false);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [scanDialogOpen, setScanDialogOpen] = useState(false);
+  const [scanInput, setScanInput] = useState('');
 
   // Форма создания сертификата
   const [newCert, setNewCert] = useState({
@@ -171,6 +173,26 @@ export default function Certificates() {
       setSnackbar({
         open: true,
         message: error.response?.data?.detail || 'Ошибка передачи сертификата',
+        severity: 'error',
+      });
+    }
+  };
+
+  const handleScanVerify = async () => {
+    if (!scanInput) return;
+    
+    try {
+      const response = await axios.post('/certificates/verify', { code: scanInput });
+      setVerifyResult(response.data);
+      setVerifyCode(scanInput);
+      setScanDialogOpen(false);
+      setVerifyDialogOpen(true);
+      setScanInput('');
+    } catch (err) {
+      console.error('Ошибка проверки:', err);
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.detail || 'Сертификат не найден',
         severity: 'error',
       });
     }
@@ -386,6 +408,16 @@ export default function Certificates() {
               <Button
                 fullWidth
                 variant="outlined"
+                startIcon={<QrCodeIcon />}
+                onClick={() => setScanDialogOpen(true)}
+              >
+                Сканировать
+              </Button>
+            </Grid>
+            <Grid item xs={12} sm={2}>
+              <Button
+                fullWidth
+                variant="outlined"
                 startIcon={<CheckIcon />}
                 onClick={() => {
                   setVerifyCode('');
@@ -396,14 +428,14 @@ export default function Certificates() {
                 Проверить
               </Button>
             </Grid>
-            <Grid item xs={12} sm={3}>
+            <Grid item xs={12} sm={2}>
               <Button
                 fullWidth
                 variant="contained"
                 startIcon={<AddIcon />}
                 onClick={() => setCreateDialogOpen(true)}
               >
-                Создать сертификат
+                Создать
               </Button>
             </Grid>
           </Grid>
@@ -655,6 +687,41 @@ export default function Certificates() {
             onClick={handleVerifyCertificate}
             variant="contained"
             disabled={!verifyCode}
+          >
+            Проверить
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Диалог сканирования QR-кода */}
+      <Dialog open={scanDialogOpen} onClose={() => setScanDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Сканировать QR-код сертификата</DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mb: 3 }}>
+            Отсканируйте QR-код сертификата или введите код вручную
+          </Alert>
+          <TextField
+            autoFocus
+            fullWidth
+            label="Код сертификата"
+            placeholder="CERT-XXXXXXXXXXXX"
+            value={scanInput}
+            onChange={(e) => setScanInput(e.target.value.toUpperCase())}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                handleScanVerify();
+              }
+            }}
+            helperText="Отсканируйте QR-код или введите код вручную"
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setScanDialogOpen(false)}>Отмена</Button>
+          <Button 
+            onClick={handleScanVerify} 
+            variant="contained"
+            disabled={!scanInput}
           >
             Проверить
           </Button>
