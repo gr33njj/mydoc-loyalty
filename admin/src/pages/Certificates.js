@@ -231,6 +231,8 @@ export default function Certificates() {
       const response = await axios.post('/certificates/redeem', {
         code: selectedCertForUse.code,
         amount: parseFloat(useAmount),
+        onec_document_id: null,
+        notes: `Погашение через админ-панель`
       });
 
       console.log('Ответ погашения:', response.data);
@@ -252,9 +254,20 @@ export default function Certificates() {
     } catch (error) {
       console.error('Ошибка погашения сертификата:', error);
       console.error('Детали:', error.response?.data);
+      
+      // Обработка ошибки валидации (массив detail)
+      let errorMessage = 'Ошибка погашения сертификата';
+      if (error.response?.data?.detail) {
+        if (Array.isArray(error.response.data.detail)) {
+          errorMessage = error.response.data.detail.map(err => err.msg || err).join(', ');
+        } else if (typeof error.response.data.detail === 'string') {
+          errorMessage = error.response.data.detail;
+        }
+      }
+      
       setSnackbar({
         open: true,
-        message: error.response?.data?.detail || 'Ошибка погашения сертификата',
+        message: errorMessage,
         severity: 'error',
       });
     }
