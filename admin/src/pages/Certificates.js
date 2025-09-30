@@ -226,14 +226,18 @@ export default function Certificates() {
     if (!selectedCertForUse || !useAmount) return;
 
     try {
+      console.log('Погашение сертификата:', selectedCertForUse.code, 'на сумму:', useAmount);
+      
       const response = await axios.post('/certificates/redeem', {
         code: selectedCertForUse.code,
         amount: parseFloat(useAmount),
       });
 
+      console.log('Ответ погашения:', response.data);
+
       setSnackbar({
         open: true,
-        message: `Сертификат погашен на ${useAmount} ₽. Остаток: ${response.data.remaining_amount.toFixed(2)} ₽`,
+        message: `Сертификат погашен на ${useAmount} ₽. Остаток: ${response.data.remaining_amount?.toFixed(2) || 0} ₽`,
         severity: 'success',
       });
 
@@ -242,9 +246,12 @@ export default function Certificates() {
       setUseAmount('');
       setVerifyDialogOpen(false);
       setVerifyResult(null);
-      fetchCertificates();
+      
+      // Обновляем список сертификатов
+      setTimeout(() => fetchCertificates(), 500);
     } catch (error) {
       console.error('Ошибка погашения сертификата:', error);
+      console.error('Детали:', error.response?.data);
       setSnackbar({
         open: true,
         message: error.response?.data?.detail || 'Ошибка погашения сертификата',
@@ -532,17 +539,84 @@ export default function Certificates() {
         </Card>
       ) : (
         <Card>
-          <CardContent>
-            <Box sx={{ height: 600, width: '100%' }}>
-              <DataGrid
-                rows={filteredCertificates}
-                columns={columns}
-                pageSize={10}
-                rowsPerPageOptions={[10, 25, 50]}
-                disableSelectionOnClick
-              />
-            </Box>
-          </CardContent>
+          {/* Десктопная версия */}
+          <Box sx={{ display: { xs: 'none', md: 'block' } }}>
+            <CardContent>
+              <Box sx={{ height: 600, width: '100%' }}>
+                <DataGrid
+                  rows={filteredCertificates}
+                  columns={columns}
+                  pageSize={10}
+                  rowsPerPageOptions={[10, 25, 50]}
+                  disableSelectionOnClick
+                />
+              </Box>
+            </CardContent>
+          </Box>
+
+          {/* Мобильная версия */}
+          <Box sx={{ display: { xs: 'block', md: 'none' } }}>
+            {filteredCertificates.map((cert) => (
+              <Card key={cert.id} sx={{ m: 2, boxShadow: 2 }}>
+                <CardContent>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Typography variant="h6" sx={{ fontSize: '0.95rem', fontWeight: 'bold' }}>
+                      {cert.code}
+                    </Typography>
+                    <Chip 
+                      label={getStatusLabel(cert.status)} 
+                      color={getStatusColor(cert.status)} 
+                      size="small" 
+                    />
+                  </Box>
+                  
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                      💰 Баланс: <strong>{cert.current_amount?.toFixed(0)} ₽</strong> / {cert.initial_amount?.toFixed(0)} ₽
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                      👤 Владелец: {cert.owner_email || 'Не назначен'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                      🎨 Дизайн: {getDesignLabel(cert.design)}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      📅 Создан: {cert.issued_at ? format(new Date(cert.issued_at), 'dd.MM.yyyy') : '—'}
+                    </Typography>
+                  </Box>
+                  
+                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {cert.qr_code_url && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<QrCodeIcon />}
+                        onClick={() => window.open(cert.qr_code_url, '_blank')}
+                        sx={{ flex: 1, minWidth: '100px' }}
+                      >
+                        QR
+                      </Button>
+                    )}
+                    {cert.status === 'active' && cert.current_amount > 0 && (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        color="primary"
+                        onClick={() => {
+                          setSelectedCertForUse(cert);
+                          setUseAmount(cert.current_amount.toString());
+                          setUseDialogOpen(true);
+                        }}
+                        sx={{ flex: 2, minWidth: '120px' }}
+                      >
+                        Погасить
+                      </Button>
+                    )}
+                  </Box>
+                </CardContent>
+              </Card>
+            ))}
+          </Box>
         </Card>
       )}
 
