@@ -1,9 +1,11 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 import time
 import logging
+import os
 
 from config import settings
 from database import engine, Base
@@ -87,6 +89,15 @@ app.include_router(certificates.router, prefix="/api/certificates", tags=["Се�
 app.include_router(referrals.router, prefix="/api/referrals", tags=["Рефералы"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Администрирование"])
 app.include_router(integrations.router, prefix="/api/integrations", tags=["Интеграции"])
+
+# Статические файлы (QR-коды и uploads)
+qrcode_dir = "/app/qrcodes"
+uploads_dir = "/app/uploads"
+os.makedirs(qrcode_dir, exist_ok=True)
+os.makedirs(uploads_dir, exist_ok=True)
+
+app.mount("/qrcodes", StaticFiles(directory=qrcode_dir), name="qrcodes")
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 
 # Обработчик ошибок
