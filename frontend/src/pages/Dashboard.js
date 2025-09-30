@@ -19,6 +19,7 @@ import { useNavigate } from 'react-router-dom';
 export default function Dashboard() {
   const [balance, setBalance] = useState(null);
   const [stats, setStats] = useState(null);
+  const [certificates, setCertificates] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -28,13 +29,15 @@ export default function Dashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const [balanceRes, statsRes] = await Promise.all([
+      const [balanceRes, statsRes, certsRes] = await Promise.all([
         axios.get('/loyalty/balance'),
         axios.get('/referrals/stats'),
+        axios.get('/certificates/my'),
       ]);
       
       setBalance(balanceRes.data);
       setStats(statsRes.data);
+      setCertificates(certsRes.data || []);
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
     } finally {
@@ -69,7 +72,7 @@ export default function Dashboard() {
     },
     {
       title: 'Сертификаты',
-      value: '0', // TODO: Add certificates count
+      value: certificates.length || '0',
       icon: <CardGiftcardIcon sx={{ fontSize: 40 }} />,
       color: '#e60a41',
       action: () => navigate('/certificates'),
