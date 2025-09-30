@@ -123,7 +123,7 @@ class CertificateResponse(BaseModel):
     initial_amount: float
     current_amount: float
     status: CertificateStatus
-    owner_id: int
+    owner_id: Optional[int] = None  # Может быть None для сертификатов без владельца
     issued_at: datetime
     valid_from: datetime
     valid_until: datetime
