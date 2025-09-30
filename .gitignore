@@ -1,0 +1,71 @@
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+.pnp
+.pnp.js
+
+# React build
+frontend/build/
+admin/build/
+frontend/.env
+admin/.env
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
+
+# Database
+*.db
+*.sqlite3
+
+# Uploads & QR codes
+backend/uploads/
+backend/qrcodes/
+
+# SSL certificates
+nginx/ssl/*.pem
+nginx/ssl/*.key
+
+# Backups
+backups/
+*.sql.gz
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
