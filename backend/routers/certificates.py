@@ -384,7 +384,7 @@ def redeem_certificate(
         amount_used=redeem_data.amount,
         remaining_amount=remaining_amount,
         onec_document_id=redeem_data.onec_document_id,
-        redeemed_by_id=current_user.id,
+        redeemed_by_id=current_user.id,  # Берем из токена, а не из запроса
         notes=redeem_data.notes
     )
     db.add(redemption)

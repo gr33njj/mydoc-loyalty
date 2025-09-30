@@ -155,7 +155,6 @@ class CertificateVerifyResponse(BaseModel):
 class CertificateRedeemRequest(BaseModel):
     code: str
     amount: float
-    cashier_id: int
     onec_document_id: Optional[str] = None
     notes: Optional[str] = None
 
