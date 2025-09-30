@@ -404,20 +404,33 @@ export default function Certificates() {
       </Dialog>
 
       {/* Диалог отображения QR-кода */}
-      <Dialog open={qrDialogOpen} onClose={() => setQrDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ textAlign: 'center', fontWeight: 'bold' }}>
+      <Dialog 
+        open={qrDialogOpen} 
+        onClose={() => setQrDialogOpen(false)} 
+        maxWidth="sm" 
+        fullWidth
+        fullScreen={false}
+        PaperProps={{
+          sx: {
+            m: { xs: 2, sm: 3 },
+            maxWidth: { xs: 'calc(100vw - 32px)', sm: 600 }
+          }
+        }}
+      >
+        <DialogTitle sx={{ textAlign: 'center', fontWeight: 'bold', pb: 1 }}>
           QR-код сертификата
         </DialogTitle>
         <DialogContent>
-          <Box sx={{ textAlign: 'center', py: 3 }}>
+          <Box sx={{ textAlign: 'center', py: { xs: 2, sm: 3 } }}>
             {selectedCertForQr && (
               <>
                 <Box sx={{ 
                   display: 'inline-block', 
-                  p: 3, 
+                  p: { xs: 2, sm: 3 },
                   bgcolor: 'white', 
                   borderRadius: 2,
-                  boxShadow: 3
+                  boxShadow: 3,
+                  maxWidth: '100%'
                 }}>
                   <img 
                     src={selectedCertForQr.qr_code_url} 
@@ -430,24 +443,27 @@ export default function Certificates() {
                     }} 
                   />
                 </Box>
-                <Typography variant="h6" sx={{ mt: 3, fontWeight: 'bold', color: 'primary.main' }}>
+                <Typography variant="h6" sx={{ mt: { xs: 2, sm: 3 }, fontWeight: 'bold', color: 'primary.main', fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
                   {selectedCertForQr.code}
                 </Typography>
-                <Typography variant="body1" sx={{ mt: 1 }}>
-                  Номинал: {selectedCertForQr.initial_amount.toFixed(0)} ₽
+                <Typography variant="body1" sx={{ mt: 1, fontSize: { xs: '0.95rem', sm: '1rem' } }}>
+                  Баланс: {selectedCertForQr.current_amount?.toFixed(0) || selectedCertForQr.initial_amount.toFixed(0)} ₽
                 </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1, px: { xs: 1, sm: 0 } }}>
                   Покажите этот QR-код на кассе для оплаты
                 </Typography>
               </>
             )}
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setQrDialogOpen(false)}>Закрыть</Button>
+        <DialogActions sx={{ px: { xs: 2, sm: 3 }, pb: { xs: 2, sm: 2 } }}>
+          <Button onClick={() => setQrDialogOpen(false)} fullWidth={false}>
+            Закрыть
+          </Button>
           {selectedCertForQr && (
             <Button 
               variant="contained" 
+              fullWidth={false}
               onClick={() => {
                 const link = document.createElement('a');
                 link.href = selectedCertForQr.qr_code_url;
