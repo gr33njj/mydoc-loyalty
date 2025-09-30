@@ -196,14 +196,25 @@ export default function Certificates() {
     
     try {
       const response = await axios.post('/certificates/verify', { code: certCode });
-      setVerifyResult(response.data);
+      console.log('Ответ проверки:', response.data);
+      
+      // Убедимся что у нас есть все поля
+      const certData = {
+        ...response.data,
+        code: response.data.code || certCode,
+        current_amount: response.data.current_amount || 0,
+        status: response.data.status || 'unknown'
+      };
+      
+      setVerifyResult(certData);
       setVerifyCode(certCode);
       setVerifyDialogOpen(true);
     } catch (err) {
       console.error('Ошибка проверки:', err);
+      console.error('Детали ошибки:', err.response?.data);
       setSnackbar({
         open: true,
-        message: err.response?.data?.detail || 'Сертификат не найден',
+        message: err.response?.data?.detail || err.message || 'Сертификат не найден',
         severity: 'error',
       });
     }

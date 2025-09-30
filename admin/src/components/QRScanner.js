@@ -21,12 +21,21 @@ export default function QRScanner({ onScanSuccess, onClose }) {
     try {
       const devices = await Html5Qrcode.getCameras();
       if (devices && devices.length > 0) {
-        // Предпочитаем заднюю камеру
-        const backCamera = devices.find(device => 
-          device.label.toLowerCase().includes('back') || 
-          device.label.toLowerCase().includes('rear')
-        );
-        return backCamera ? backCamera.id : devices[0].id;
+        console.log('Доступные камеры:', devices);
+        
+        // Предпочитаем заднюю камеру (более надежный поиск)
+        const backCamera = devices.find(device => {
+          const label = device.label.toLowerCase();
+          return label.includes('back') || 
+                 label.includes('rear') || 
+                 label.includes('environment') ||
+                 label.includes('facing back');
+        });
+        
+        // Если нашли заднюю - используем её, иначе последнюю (обычно задняя)
+        const selectedCamera = backCamera ? backCamera.id : devices[devices.length - 1].id;
+        console.log('Выбрана камера:', selectedCamera);
+        return selectedCamera;
       } else {
         throw new Error('Камеры не найдены');
       }
