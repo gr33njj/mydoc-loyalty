@@ -226,20 +226,22 @@ export default function Certificates() {
     if (!selectedCertForUse || !useAmount) return;
 
     try {
-      await axios.post('/certificates/use', {
+      const response = await axios.post('/certificates/redeem', {
         code: selectedCertForUse.code,
         amount: parseFloat(useAmount),
       });
 
       setSnackbar({
         open: true,
-        message: `Сертификат погашен на ${useAmount} ₽`,
+        message: `Сертификат погашен на ${useAmount} ₽. Остаток: ${response.data.remaining_amount.toFixed(2)} ₽`,
         severity: 'success',
       });
 
       setUseDialogOpen(false);
       setSelectedCertForUse(null);
       setUseAmount('');
+      setVerifyDialogOpen(false);
+      setVerifyResult(null);
       fetchCertificates();
     } catch (error) {
       console.error('Ошибка погашения сертификата:', error);
