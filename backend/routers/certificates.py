@@ -124,7 +124,7 @@ def get_my_certificates(
     
     certificates = db.query(Certificate).filter(
         Certificate.owner_id == current_user.id
-    ).order_by(Certificate.created_at.desc()).all()
+    ).order_by(Certificate.issued_at.desc()).all()
     
     responses = []
     for cert in certificates:
