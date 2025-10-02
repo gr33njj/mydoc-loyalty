@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 // Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
+import SSOCallback from './pages/SSOCallback';
 import Dashboard from './pages/Dashboard';
 import Loyalty from './pages/Loyalty';
 import Certificates from './pages/Certificates';
@@ -90,6 +91,7 @@ function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/auth/callback" element={<SSOCallback />} />
             
             <Route path="/" element={
               <ProtectedRoute>
