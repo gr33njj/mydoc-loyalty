@@ -22,7 +22,7 @@ export default function SSORedirect() {
       try {
         console.log('🔄 Проверка токена от Bitrix:', token);
         
-        const response = await axios.post('/auth/bitrix/verify-token', {
+        const response = await axios.post('/api/auth/bitrix/verify-token', {
           token: token
         });
 
