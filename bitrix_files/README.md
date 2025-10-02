@@ -4,19 +4,21 @@
 
 ## 📋 Инструкция по установке
 
-### 1. Создайте директорию на сервере Bitrix
+### 1. Создайте директории на сервере Bitrix
 
 ```bash
 # На сервере Bitrix (обычно /var/www/html или путь к Bitrix)
 mkdir -p /path/to/bitrix/local/api
+mkdir -p /path/to/bitrix/local/pages
 ```
 
 ### 2. Скопируйте файлы
 
-**Скопируйте 2 файла в директорию `/local/api/`:**
+**Скопируйте 3 файла:**
 
-- `loyalty_token.php` → `/local/api/loyalty_token.php`
+- `loyalty_redirect.php` → `/local/pages/loyalty_redirect.php` ⭐ ГЛАВНЫЙ
 - `verify_token.php` → `/local/api/verify_token.php`
+- `loyalty_token.php` → `/local/api/loyalty_token.php` (для отладки)
 
 ```bash
 # На сервере Bitrix:
@@ -66,8 +68,7 @@ https://mydoctorarmavir.ru/local/api/loyalty_token.php
 
 ```html
 <!-- Кнопка программы лояльности -->
-<a href="https://it-mydoc.ru/login" 
-   target="_blank"
+<a href="https://mydoctorarmavir.ru/local/pages/loyalty_redirect.php" 
    class="loyalty-btn"
    style="
      display: inline-flex;

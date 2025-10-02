@@ -17,63 +17,10 @@ import axios from 'axios';
 export default function Login() {
   const [loading, setLoading] = useState(false);
 
-  const handleBitrixLogin = async () => {
-    try {
-      setLoading(true);
-      
-      // 1. Запрашиваем токен у Bitrix
-      console.log('🔄 Запрос токена у Bitrix...');
-      const response = await fetch('https://mydoctorarmavir.ru/local/api/loyalty_token.php', {
-        method: 'GET',
-        credentials: 'include', // Важно! Отправляем cookies
-        headers: {
-          'Accept': 'application/json',
-        }
-      });
-      
-      const data = await response.json();
-      console.log('📥 Ответ от Bitrix:', data);
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Не удалось получить токен от Bitrix');
-      }
-      
-      // 2. Проверяем токен на нашем backend
-      console.log('🔄 Проверка токена на backend...');
-      const authResponse = await axios.post('/auth/bitrix/verify-token', {
-        token: data.token
-      });
-      console.log('📥 Ответ от backend:', authResponse.data);
-      
-      if (authResponse.data.success && authResponse.data.token) {
-        // 3. Сохраняем JWT токен
-        localStorage.setItem('token', authResponse.data.token);
-        console.log('✅ JWT токен сохранен');
-        
-        // 4. Перенаправляем в личный кабинет
-        window.location.href = '/';
-      } else {
-        throw new Error('Не удалось авторизоваться');
-      }
-      
-    } catch (error) {
-      console.error('❌ Ошибка SSO:', error);
-      console.error('📋 Детали ошибки:', error.response?.data);
-      
-      let errorMessage = 'Ошибка авторизации';
-      
-      if (error.message && error.message.includes('CORS')) {
-        errorMessage = 'Пожалуйста, авторизуйтесь сначала на сайте клиники';
-      } else if (error.response?.data?.detail) {
-        errorMessage = error.response.data.detail;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      alert(errorMessage + '\n\nПроверьте консоль (F12) для подробностей');
-    } finally {
-      setLoading(false);
-    }
+  const handleBitrixLogin = () => {
+    // Редирект на промежуточную страницу Bitrix
+    // Она проверит авторизацию, создаст токен и вернет обратно
+    window.location.href = 'https://mydoctorarmavir.ru/local/pages/loyalty_redirect.php';
   };
 
   return (
