@@ -75,8 +75,8 @@ async def verify_bitrix_token(
             db.commit()
             db.refresh(user)
         
-        # Генерируем JWT токен
-        access_token = create_access_token(data={"sub": user.email})
+        # Генерируем JWT токен (используем ID как в обычном login)
+        access_token = create_access_token(data={"sub": str(user.id)})
         
         return {
             "success": True,
