@@ -19,9 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-// Принудительно стартуем сессию
-session_start();
-
+// ВАЖНО: Сначала загружаем Bitrix, потом работаем с сессией
 require($_SERVER["DOCUMENT_ROOT"] . "/bitrix/modules/main/include/prolog_before.php");
 
 global $USER;
