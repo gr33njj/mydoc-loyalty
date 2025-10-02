@@ -1,7 +1,8 @@
 # 🚀 SSO - Быстрый старт
 
-> ⚠️ **ВАЖНО!** Если у вас были установлены старые версии файлов, **обязательно обновите их**!  
-> В последнем коммите добавлен критический `session_start()` для работы токенов.
+> ⚠️ **КРИТИЧНО!** Обязательно используйте последние версии файлов!  
+> **Изменение:** Токены теперь хранятся в ФАЙЛАХ вместо сессий (межсерверные запросы не имеют доступа к $_SESSION).  
+> **Требуется:** Директория `/upload/loyalty_tokens/` с правами на запись.
 
 ## ✅ Что уже сделано
 
@@ -38,17 +39,19 @@
 # 1. Создайте директории
 mkdir -p /var/www/html/local/pages
 mkdir -p /var/www/html/local/api
+mkdir -p /var/www/html/upload/loyalty_tokens
 
 # 2. Скачайте файлы с GitHub
 cd /var/www/html/local/pages/
-wget https://raw.githubusercontent.com/gr33njj/mydoc-loyalty/main/bitrix_files/loyalty_redirect.php
+wget -O loyalty_redirect.php https://raw.githubusercontent.com/gr33njj/mydoc-loyalty/main/bitrix_files/loyalty_redirect.php
 
 cd /var/www/html/local/api/
-wget https://raw.githubusercontent.com/gr33njj/mydoc-loyalty/main/bitrix_files/verify_token.php
+wget -O verify_token.php https://raw.githubusercontent.com/gr33njj/mydoc-loyalty/main/bitrix_files/verify_token.php
 
 # 3. Установите права
 chmod 644 /var/www/html/local/pages/loyalty_redirect.php
 chmod 644 /var/www/html/local/api/verify_token.php
+chmod 777 /var/www/html/upload/loyalty_tokens
 ```
 
 ### Вариант 2: Скачать вручную
@@ -92,13 +95,23 @@ it-mydoc.ru/login (нажимает кнопку)
 mydoctorarmavir.ru/local/pages/loyalty_redirect.php
     ↓ (Bitrix проверяет авторизацию)
     ↓ (Создает токен)
+    ↓ (Сохраняет в ФАЙЛ /upload/loyalty_tokens/XXX.json)
     ↓
 it-mydoc.ru/auth/sso?token=XXX
-    ↓ (Frontend проверяет токен)
-    ↓ (Получает JWT)
+    ↓ (Frontend отправляет токен на backend)
+    ↓
+Backend → POST mydoctorarmavir.ru/verify_token.php
+    ↓ (Читает токен из ФАЙЛА)
+    ↓ (Возвращает данные пользователя)
+    ↓
+Backend создает JWT токен
+    ↓
+Frontend сохраняет JWT
     ↓
 it-mydoc.ru/ ✅ АВТОРИЗОВАН!
 ```
+
+**Важно:** Токены хранятся в файлах, т.к. `verify_token.php` получает запрос от другого сервера без cookies Bitrix.
 
 ---
 
