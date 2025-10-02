@@ -31,9 +31,13 @@ export default function SSORedirect() {
         if (response.data.success && response.data.token) {
           // Сохраняем JWT токен (как access_token для AuthContext)
           localStorage.setItem('access_token', response.data.token);
-          console.log('✅ JWT токен сохранен, перезагрузка страницы...');
+          console.log('✅ JWT токен сохранен:', response.data.token.substring(0, 50) + '...');
           
-          // Перезагружаем страницу чтобы AuthContext подхватил токен
+          // ВАЖНО: Даем время localStorage сохранить данные (async)
+          // и только потом перезагружаем страницу
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          console.log('🔄 Перезагрузка страницы...');
           window.location.href = '/';
         } else {
           throw new Error('Не удалось получить JWT токен');
