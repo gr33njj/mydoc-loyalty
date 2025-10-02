@@ -29,12 +29,12 @@ export default function SSORedirect() {
         console.log('📥 Ответ от backend:', response.data);
 
         if (response.data.success && response.data.token) {
-          // Сохраняем JWT токен
-          localStorage.setItem('token', response.data.token);
-          console.log('✅ JWT токен сохранен, редирект в ЛК');
+          // Сохраняем JWT токен (как access_token для AuthContext)
+          localStorage.setItem('access_token', response.data.token);
+          console.log('✅ JWT токен сохранен, перезагрузка страницы...');
           
-          // Редирект в личный кабинет
-          navigate('/');
+          // Перезагружаем страницу чтобы AuthContext подхватил токен
+          window.location.href = '/';
         } else {
           throw new Error('Не удалось получить JWT токен');
         }
