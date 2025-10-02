@@ -20,6 +20,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // ВАЖНО: Сначала загружаем Bitrix, потом работаем с сессией
 require($_SERVER["DOCUMENT_ROOT"] . "/bitrix/modules/main/include/prolog_before.php");
 
+// Убеждаемся что сессия запущена
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 // Получаем токен из POST
 $input = json_decode(file_get_contents('php://input'), true);
 $token = $input['token'] ?? '';

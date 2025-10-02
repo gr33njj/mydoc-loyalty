@@ -66,7 +66,7 @@ async def verify_bitrix_token(
                 # Создаем нового пользователя
                 user = User(
                     email=email,
-                    hashed_password=get_password_hash(secrets.token_urlsafe(16)),
+                    password_hash=get_password_hash(secrets.token_urlsafe(16)),
                     bitrix_id=bitrix_id,
                     role="patient"
                 )
