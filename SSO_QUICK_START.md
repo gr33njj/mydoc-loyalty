@@ -1,10 +1,14 @@
 # 🚀 SSO - Быстрый старт
 
+> ⚠️ **ВАЖНО!** Если у вас были установлены старые версии файлов, **обязательно обновите их**!  
+> В последнем коммите добавлен критический `session_start()` для работы токенов.
+
 ## ✅ Что уже сделано
 
 - ✅ Frontend с кнопкой "Войти через Мой Доктор"
 - ✅ Backend API для проверки токенов
 - ✅ Редирект-based SSO (без проблем с CORS)
+- ✅ Исправлена работа PHP сессий (session_start)
 
 ## 📁 Файлы для установки на Bitrix
 
@@ -24,25 +28,40 @@
 
 ---
 
-## 🔧 Установка (3 минуты)
+## 🔧 Установка (1 минута)
 
-### На сервере Bitrix:
+### Вариант 1: Через wget (рекомендуется)
 
 ```bash
+# На сервере Bitrix:
+
 # 1. Создайте директории
 mkdir -p /var/www/html/local/pages
 mkdir -p /var/www/html/local/api
 
-# 2. Скопируйте файлы
-# loyalty_redirect.php → /var/www/html/local/pages/
-# verify_token.php     → /var/www/html/local/api/
+# 2. Скачайте файлы с GitHub
+cd /var/www/html/local/pages/
+wget https://raw.githubusercontent.com/gr33njj/mydoc-loyalty/main/bitrix_files/loyalty_redirect.php
+
+cd /var/www/html/local/api/
+wget https://raw.githubusercontent.com/gr33njj/mydoc-loyalty/main/bitrix_files/verify_token.php
 
 # 3. Установите права
 chmod 644 /var/www/html/local/pages/loyalty_redirect.php
 chmod 644 /var/www/html/local/api/verify_token.php
-chown www-data:www-data /var/www/html/local/pages/*.php
-chown www-data:www-data /var/www/html/local/api/*.php
 ```
+
+### Вариант 2: Скачать вручную
+
+Скачайте файлы по прямым ссылкам:
+
+1. **loyalty_redirect.php:**  
+   https://raw.githubusercontent.com/gr33njj/mydoc-loyalty/main/bitrix_files/loyalty_redirect.php  
+   → Сохранить в `/var/www/html/local/pages/`
+
+2. **verify_token.php:**  
+   https://raw.githubusercontent.com/gr33njj/mydoc-loyalty/main/bitrix_files/verify_token.php  
+   → Сохранить в `/var/www/html/local/api/`
 
 ---
 
