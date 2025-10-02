@@ -37,8 +37,8 @@ $userLogin = $USER->GetLogin();
 // Генерируем токен
 $token = md5($userId . time() . 'mydoc_loyalty_secret_2025');
 
-// Сохраняем в сессию
-$_SESSION['LOYALTY_TOKEN_' . $token] = [
+// Сохраняем в файл (вместо сессии, т.к. verify_token.php получает запрос от другого сервера)
+$tokenData = [
     'user_id' => $userId,
     'email' => $userEmail ?: $userLogin . '@mydoc.local',
     'name' => $userName,
@@ -46,6 +46,14 @@ $_SESSION['LOYALTY_TOKEN_' . $token] = [
     'created_at' => time(),
     'expires_at' => time() + 300 // 5 минут
 ];
+
+$tokenDir = $_SERVER["DOCUMENT_ROOT"] . '/upload/loyalty_tokens/';
+if (!is_dir($tokenDir)) {
+    mkdir($tokenDir, 0755, true);
+}
+
+$tokenFile = $tokenDir . $token . '.json';
+file_put_contents($tokenFile, json_encode($tokenData));
 
 // Редирект на it-mydoc.ru с токеном
 $redirectUrl = 'https://it-mydoc.ru/auth/sso?token=' . $token;

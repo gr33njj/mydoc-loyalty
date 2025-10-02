@@ -34,25 +34,36 @@ if (empty($token)) {
     exit;
 }
 
-// Проверяем токен в сессии
-$sessionKey = 'LOYALTY_TOKEN_' . $token;
+// Проверяем токен в файле (а не в сессии, т.к. запрос приходит от другого сервера)
+$tokenDir = $_SERVER["DOCUMENT_ROOT"] . '/upload/loyalty_tokens/';
+$tokenFile = $tokenDir . $token . '.json';
 
-if (!isset($_SESSION[$sessionKey])) {
+// Очищаем старые токены (> 10 минут)
+if (is_dir($tokenDir)) {
+    $files = glob($tokenDir . '*.json');
+    foreach ($files as $file) {
+        if (filemtime($file) < time() - 600) {
+            @unlink($file);
+        }
+    }
+}
+
+if (!file_exists($tokenFile)) {
     echo json_encode(['success' => false, 'error' => 'Invalid token'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-$tokenData = $_SESSION[$sessionKey];
+$tokenData = json_decode(file_get_contents($tokenFile), true);
 
 // Проверяем срок действия
 if ($tokenData['expires_at'] < time()) {
-    unset($_SESSION[$sessionKey]);
+    unlink($tokenFile);
     echo json_encode(['success' => false, 'error' => 'Token expired'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
 // Удаляем использованный токен (одноразовый)
-unset($_SESSION[$sessionKey]);
+unlink($tokenFile);
 
 // Возвращаем данные пользователя
 echo json_encode([
