@@ -24,11 +24,31 @@ require($_SERVER["DOCUMENT_ROOT"] . "/bitrix/modules/main/include/prolog_before.
 
 global $USER;
 
+// Отладка: проверим, что USER определен
+if (!isset($USER)) {
+    echo json_encode([
+        'success' => false,
+        'error' => 'USER object not found',
+        'debug' => 'Bitrix USER not initialized'
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// Отладка: проверим cookies
+$debug_info = [
+    'cookies_received' => !empty($_COOKIE),
+    'session_id' => session_id(),
+    'bitrix_session' => isset($_COOKIE['BITRIX_SM_LOGIN']) ? 'exists' : 'missing',
+    'user_authorized' => $USER->IsAuthorized(),
+    'user_id' => $USER->GetID()
+];
+
 // Проверяем авторизацию
 if (!$USER->IsAuthorized()) {
     echo json_encode([
         'success' => false,
-        'error' => 'User not authorized'
+        'error' => 'User not authorized',
+        'debug' => $debug_info
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
