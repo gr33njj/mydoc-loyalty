@@ -41,6 +41,7 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     external_id = Column(String, unique=True, index=True, nullable=True)  # ID из 1C/Bitrix
+    bitrix_id = Column(String, unique=True, index=True, nullable=True)  # ID из Bitrix (для SSO)
     email = Column(String, unique=True, index=True)
     phone = Column(String, unique=True, index=True, nullable=True)
     full_name = Column(String)

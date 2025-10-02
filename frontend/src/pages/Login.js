@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Container,
   Box,
@@ -8,15 +8,66 @@ import {
   Typography,
   Divider,
   Stack,
+  CircularProgress,
 } from '@mui/material';
 import FavoriteIcon from '@mui/icons-material/Favorite';
-import LoginIcon from '@mui/icons-material/Login';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
+import axios from 'axios';
 
 export default function Login() {
-  const handleBitrixLogin = () => {
-    // Редирект на SSO авторизацию через Bitrix
-    window.location.href = 'https://it-mydoc.ru/auth/bitrix/login';
+  const [loading, setLoading] = useState(false);
+
+  const handleBitrixLogin = async () => {
+    try {
+      setLoading(true);
+      
+      // 1. Запрашиваем токен у Bitrix
+      const response = await fetch('https://mydoctorarmavir.ru/local/api/loyalty_token.php', {
+        method: 'GET',
+        credentials: 'include', // Важно! Отправляем cookies
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Не удалось получить токен от Bitrix');
+      }
+      
+      // 2. Проверяем токен на нашем backend
+      const authResponse = await axios.post('/auth/bitrix/verify-token', {
+        token: data.token
+      });
+      
+      if (authResponse.data.success && authResponse.data.token) {
+        // 3. Сохраняем JWT токен
+        localStorage.setItem('token', authResponse.data.token);
+        
+        // 4. Перенаправляем в личный кабинет
+        window.location.href = '/';
+      } else {
+        throw new Error('Не удалось авторизоваться');
+      }
+      
+    } catch (error) {
+      console.error('Ошибка SSO:', error);
+      
+      let errorMessage = 'Ошибка авторизации';
+      
+      if (error.message && error.message.includes('CORS')) {
+        errorMessage = 'Пожалуйста, авторизуйтесь сначала на сайте клиники';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -108,7 +159,8 @@ export default function Login() {
                 variant="contained"
                 size="large"
                 onClick={handleBitrixLogin}
-                startIcon={<LocalHospitalIcon />}
+                disabled={loading}
+                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <LocalHospitalIcon />}
                 sx={{
                   py: 2,
                   fontSize: '1.1rem',
@@ -120,10 +172,14 @@ export default function Login() {
                     boxShadow: '0 6px 20px rgba(0, 65, 85, 0.4)',
                     transform: 'translateY(-2px)',
                   },
+                  '&:disabled': {
+                    background: 'linear-gradient(135deg, #004155 0%, #68cdd2 100%)',
+                    opacity: 0.7,
+                  },
                   transition: 'all 0.3s ease',
                 }}
               >
-                Войти через Мой Доктор
+                {loading ? 'Авторизация...' : 'Войти через Мой Доктор'}
               </Button>
 
               <Typography 

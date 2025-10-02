@@ -9,7 +9,7 @@ import os
 
 from config import settings
 from database import engine, Base
-from routers import loyalty, certificates, referrals, auth, admin, integrations
+from routers import loyalty, certificates, referrals, auth, admin, integrations, bitrix_sso
 
 # Настройка логирования
 logging.basicConfig(
@@ -84,6 +84,7 @@ async def health_check():
 
 # Подключение роутеров
 app.include_router(auth.router, prefix="/api/auth", tags=["Авторизация"])
+app.include_router(bitrix_sso.router, prefix="/auth/bitrix", tags=["Bitrix SSO"])
 app.include_router(loyalty.router, prefix="/api/loyalty", tags=["Лояльность"])
 app.include_router(certificates.router, prefix="/api/certificates", tags=["Сертификаты"])
 app.include_router(referrals.router, prefix="/api/referrals", tags=["Рефералы"])

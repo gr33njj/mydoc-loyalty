@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     BITRIX_API_URL: Optional[str] = None
     BITRIX_WEBHOOK: Optional[str] = None
     
+    # Bitrix SSO
+    bitrix_domain: str = "https://mydoctorarmavir.ru"
+    base_url: str = "https://it-mydoc.ru"
+    
     # Email (SMTP)
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
