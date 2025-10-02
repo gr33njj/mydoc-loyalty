@@ -22,6 +22,7 @@ export default function Login() {
       setLoading(true);
       
       // 1. Запрашиваем токен у Bitrix
+      console.log('🔄 Запрос токена у Bitrix...');
       const response = await fetch('https://mydoctorarmavir.ru/local/api/loyalty_token.php', {
         method: 'GET',
         credentials: 'include', // Важно! Отправляем cookies
@@ -31,19 +32,23 @@ export default function Login() {
       });
       
       const data = await response.json();
+      console.log('📥 Ответ от Bitrix:', data);
       
       if (!data.success) {
         throw new Error(data.error || 'Не удалось получить токен от Bitrix');
       }
       
       // 2. Проверяем токен на нашем backend
+      console.log('🔄 Проверка токена на backend...');
       const authResponse = await axios.post('/auth/bitrix/verify-token', {
         token: data.token
       });
+      console.log('📥 Ответ от backend:', authResponse.data);
       
       if (authResponse.data.success && authResponse.data.token) {
         // 3. Сохраняем JWT токен
         localStorage.setItem('token', authResponse.data.token);
+        console.log('✅ JWT токен сохранен');
         
         // 4. Перенаправляем в личный кабинет
         window.location.href = '/';
@@ -52,7 +57,8 @@ export default function Login() {
       }
       
     } catch (error) {
-      console.error('Ошибка SSO:', error);
+      console.error('❌ Ошибка SSO:', error);
+      console.error('📋 Детали ошибки:', error.response?.data);
       
       let errorMessage = 'Ошибка авторизации';
       
@@ -64,7 +70,7 @@ export default function Login() {
         errorMessage = error.message;
       }
       
-      alert(errorMessage);
+      alert(errorMessage + '\n\nПроверьте консоль (F12) для подробностей');
     } finally {
       setLoading(false);
     }

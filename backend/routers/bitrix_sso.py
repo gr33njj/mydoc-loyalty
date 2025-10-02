@@ -22,18 +22,27 @@ async def verify_bitrix_token(
 ):
     """Проверяет токен от Bitrix и авторизует пользователя"""
     
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
+        logger.info(f"🔄 Проверка токена Bitrix: {request.token[:20]}...")
+        
         # Проверяем токен у Bitrix
         async with httpx.AsyncClient() as client:
+            logger.info(f"📡 Отправка запроса на {settings.bitrix_domain}/local/api/verify_token.php")
             response = await client.post(
                 f"{settings.bitrix_domain}/local/api/verify_token.php",
                 json={"token": request.token},
                 timeout=10.0
             )
+            logger.info(f"📥 Статус ответа: {response.status_code}")
             response.raise_for_status()
             result = response.json()
+            logger.info(f"📋 Ответ Bitrix: {result}")
         
         if not result.get('success'):
+            logger.error(f"❌ Bitrix вернул ошибку: {result.get('error')}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=result.get('error', 'Invalid token')
