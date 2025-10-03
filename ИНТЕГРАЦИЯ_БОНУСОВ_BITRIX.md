@@ -38,48 +38,48 @@ nano get_bonuses.php
 chmod 644 get_bonuses.php
 ```
 
-### 1.2 Определите название поля с бонусами
+### 1.2 Поле с бонусами
 
-**ВАЖНО!** Вам нужно узнать, в каком поле Bitrix хранит баланс бонусов:
+**ДЛЯ ВАШЕГО ПРОЕКТА:** Используется поле `UF_USER__BONUSES_JSON`, которое содержит JSON с историей всех бонусных транзакций (начисления, списания, даты истечения).
 
-1. **Откройте БД Bitrix:**
-   ```sql
-   SELECT * FROM b_user WHERE ID = 1;
-   ```
+API `get_bonuses.php` реплицирует логику из `/personal/bonuses/`:
+- Парсит JSON из `UF_USER__BONUSES_JSON`
+- Проходит по всем транзакциям (`Receipt` / `Expense`)
+- Применяет логику FIFO для списаний
+- Обрабатывает сгорания просроченных бонусов
+- Возвращает итоговый баланс
 
-2. **Найдите поле с бонусами:**
-   Возможные варианты:
-   - `UF_BONUS_BALANCE`
-   - `UF_BONUS_POINTS`
-   - `UF_LOYALTY_BALANCE`
-   - `UF_BONUSES`
+**Важно:** Если в вашем Bitrix используется другое поле или логика, обновите `get_bonuses.php` соответственно.
 
-3. **Обновите `get_bonuses.php`:**
-   Замените в коде:
-   ```php
-   if (isset($user['UF_BONUS_BALANCE'])) {  // ← Укажите правильное название!
-       $bonusBalance = floatval($user['UF_BONUS_BALANCE']);
-   }
-   ```
+### 1.3 Диагностический скрипт (опционально)
 
-### 1.3 Альтернатива: Бонусы в модуле Sale
+Для диагностики используйте `check_my_bonuses.php`:
 
-Если бонусы хранятся в модуле Sale (счет покупателя), раскомментируйте в `get_bonuses.php`:
+```bash
+# На сервере Bitrix:
+cd /home/bitrix/www/local/api/
+wget https://raw.githubusercontent.com/gr33njj/mydoc-loyalty/main/bitrix_files/check_my_bonuses.php
 
-```php
-$accounts = \Bitrix\Sale\Internals\UserAccountTable::getList([
-    'filter' => [
-        'USER_ID' => $userId,
-        'CURRENCY' => 'RUB'
-    ]
-])->fetch();
-
-if ($accounts) {
-    $bonusBalance = floatval($accounts['CURRENT_BUDGET']);
-}
+# Откройте в браузере:
+https://mydoctorarmavir.ru/local/api/check_my_bonuses.php
 ```
 
-### 1.4 Проверьте API
+Скрипт покажет:
+- Текущего пользователя и его ID
+- Наличие поля `UF_USER__BONUSES_JSON`
+- Содержимое JSON с транзакциями
+- Готовую команду `curl` для тестирования API
+
+### 1.4 Обновите файл на сервере
+
+Если вы уже установили `get_bonuses.php`, обновите его до последней версии с округлением:
+
+```bash
+cd /home/bitrix/www/local/api/ && \
+wget -O get_bonuses.php https://raw.githubusercontent.com/gr33njj/mydoc-loyalty/main/bitrix_files/get_bonuses.php
+```
+
+### 1.5 Проверьте API
 
 ```bash
 # Тест 1: Через curl
@@ -87,8 +87,8 @@ curl -X POST https://mydoctorarmavir.ru/local/api/get_bonuses.php \
   -H "Content-Type: application/json" \
   -d '{"user_id": 1}'
 
-# Ожидаемый ответ:
-# {"success":true,"user_id":"1","bonus_balance":150}
+# Ожидаемый ответ (с округлением до 2 знаков):
+# {"success":true,"user_id":"1","bonus_balance":73.24}
 ```
 
 ```bash
@@ -128,74 +128,25 @@ curl -X GET https://it-mydoc.ru/api/auth/bitrix/bonus-balance \
 
 ## 🎨 Шаг 3: Обновление Frontend
 
-### 3.1 Модифицируйте Dashboard
+### 3.1 Перезапустите frontend
 
-Откройте `frontend/src/pages/Dashboard.js` и добавьте запрос баланса из Bitrix:
-
-```javascript
-const [bitrixBalance, setBitrixBalance] = useState(null);
-const [loadingBitrix, setLoadingBitrix] = useState(true);
-
-useEffect(() => {
-  const fetchBitrixBalance = async () => {
-    try {
-      const response = await axios.get('/auth/bitrix/bonus-balance');
-      if (response.data.success) {
-        setBitrixBalance(response.data.bonus_balance);
-      }
-    } catch (error) {
-      console.error('Ошибка получения баланса из Bitrix:', error);
-    } finally {
-      setLoadingBitrix(false);
-    }
-  };
-
-  fetchBitrixBalance();
-}, []);
+```bash
+cd /tmp/mydoc-loyalty
+docker-compose restart frontend
 ```
 
-### 3.2 Отобразите баланс из Bitrix
+**Что изменилось:**
+- `Dashboard.js` теперь запрашивает баланс из `/auth/bitrix/bonus-balance`
+- `Loyalty.js` также интегрирован с Bitrix API
+- Если пользователь привязан к Bitrix (есть `bitrix_id`), отображается баланс из Bitrix
+- Если пользователь не привязан, отображается локальный баланс из `/loyalty/balance`
+- Баланс отображается с округлением до 2 знаков: `73.24`
 
-```javascript
-<Card>
-  <CardContent>
-    <Box display="flex" alignItems="center" mb={2}>
-      <AccountBalanceWalletIcon sx={{ fontSize: 40, color: 'primary.main', mr: 2 }} />
-      <Box>
-        <Typography variant="h6" color="text.secondary">
-          Бонусные баллы
-        </Typography>
-        <Typography variant="h4" fontWeight="bold" color="primary.main">
-          {loadingBitrix ? (
-            <CircularProgress size={24} />
-          ) : (
-            `${bitrixBalance?.toFixed(2) || '0.00'} ₽`
-          )}
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          из личного кабинета Мой Доктор
-        </Typography>
-      </Box>
-    </Box>
-  </CardContent>
-</Card>
-```
+### 3.2 Проверьте UI
 
-### 3.3 Модифицируйте страницу Loyalty
-
-Аналогично обновите `frontend/src/pages/Loyalty.js`:
-
-```javascript
-// В компоненте fetchLoyaltyData:
-const bitrixResponse = await axios.get('/auth/bitrix/bonus-balance');
-if (bitrixResponse.data.success) {
-  setLoyaltyData(prev => ({
-    ...prev,
-    balance: bitrixResponse.data.bonus_balance,
-    source: 'bitrix'
-  }));
-}
-```
+После перезапуска откройте:
+- **Главная страница:** https://it-mydoc.ru/ - должна показать бонусный баланс из Bitrix
+- **Страница "Бонусы":** https://it-mydoc.ru/loyalty - должна показать "Баланс из личного кабинета Мой Доктор"
 
 ---
 
@@ -218,7 +169,12 @@ curl -X POST https://mydoctorarmavir.ru/local/api/get_bonuses.php \
 }
 ```
 
-**Примечание:** `bonus_balance` - это количество бонусных баллов (без валюты). Баланс рассчитывается с учетом всех начислений, списаний и сгораний по той же логике, что используется на странице `/personal/bonuses/`.
+**Примечание:** 
+- `bonus_balance` - это количество бонусных баллов (без валюты).
+- Баланс рассчитывается с учетом всех начислений, списаний и сгораний по **той же логике**, что используется на странице `/personal/bonuses/`.
+- **Логика FIFO:** При списании баллы списываются с самых старых начислений (First-In, First-Out).
+- **Автоматическое сгорание:** Просроченные бонусы автоматически сгорают при расчете баланса.
+- **Округление:** Баланс округляется до 2 знаков после запятой (`73.24000000000001` → `73.24`).
 
 ### 2. Проверьте микросервис
 

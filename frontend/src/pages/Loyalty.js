@@ -34,12 +34,23 @@ export default function Loyalty() {
 
   const fetchLoyaltyData = async () => {
     try {
-      const [balanceRes, transactionsRes] = await Promise.all([
+      const [balanceRes, transactionsRes, bitrixBalanceRes] = await Promise.all([
         axios.get('/loyalty/balance'),
         axios.get(`/loyalty/transactions?page=${page}&page_size=10`),
+        axios.get('/auth/bitrix/bonus-balance').catch(err => {
+          console.log('Не удалось получить баланс из Bitrix:', err.response?.data?.error);
+          return { data: { success: false, bonus_balance: 0 } };
+        }),
       ]);
       
-      setBalance(balanceRes.data);
+      const balanceData = balanceRes.data;
+      
+      // Если есть баланс из Bitrix, используем его для бонусных баллов
+      if (bitrixBalanceRes.data.success) {
+        balanceData.points_balance = bitrixBalanceRes.data.bonus_balance;
+      }
+      
+      setBalance(balanceData);
       setTransactions(transactionsRes.data.transactions);
       setTotalPages(Math.ceil(transactionsRes.data.total / 10));
     } catch (error) {
@@ -101,10 +112,10 @@ export default function Loyalty() {
                 Бонусные баллы
               </Typography>
               <Typography variant="h3" fontWeight="bold" color="primary">
-                {balance?.points_balance?.toFixed(0) || '0'}
+                {balance?.points_balance?.toFixed(2) || '0'}
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Всего заработано: {balance?.points_balance?.toFixed(0) || '0'}
+                Баланс из личного кабинета Мой Доктор
               </Typography>
             </CardContent>
           </Card>

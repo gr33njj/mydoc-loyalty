@@ -29,13 +29,24 @@ export default function Dashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const [balanceRes, statsRes, certsRes] = await Promise.all([
+      const [balanceRes, statsRes, certsRes, bitrixBalanceRes] = await Promise.all([
         axios.get('/loyalty/balance'),
         axios.get('/referrals/stats'),
         axios.get('/certificates/my'),
+        axios.get('/auth/bitrix/bonus-balance').catch(err => {
+          console.log('Не удалось получить баланс из Bitrix:', err.response?.data?.error);
+          return { data: { success: false, bonus_balance: 0 } };
+        }),
       ]);
       
-      setBalance(balanceRes.data);
+      const balanceData = balanceRes.data;
+      
+      // Если есть баланс из Bitrix, используем его для бонусных баллов
+      if (bitrixBalanceRes.data.success) {
+        balanceData.points_balance = bitrixBalanceRes.data.bonus_balance;
+      }
+      
+      setBalance(balanceData);
       setStats(statsRes.data);
       setCertificates(certsRes.data || []);
     } catch (error) {
@@ -58,7 +69,7 @@ export default function Dashboard() {
   const statCards = [
     {
       title: 'Бонусные баллы',
-      value: balance?.points_balance?.toFixed(0) || '0',
+      value: balance?.points_balance?.toFixed(2) || '0',
       icon: <AccountBalanceWalletIcon sx={{ fontSize: 40 }} />,
       color: '#004155',
       action: () => navigate('/loyalty'),
