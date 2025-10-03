@@ -34,18 +34,18 @@ export default function Loyalty() {
 
   const fetchLoyaltyData = async () => {
     try {
-      const [balanceRes, transactionsRes, bitrixBalanceRes] = await Promise.all([
+      const [balanceRes, bitrixBalanceRes, bitrixHistoryRes] = await Promise.all([
         axios.get('/loyalty/balance').catch(err => {
           console.log('Локальный баланс не найден (нормально для SSO пользователей)');
           return { data: { points_balance: 0, cashback_balance: 0, card_tier: 'Bronze', transactions_count: 0 } };
         }),
-        axios.get(`/loyalty/transactions?page=${page}&page_size=10`).catch(err => {
-          console.log('Транзакции не найдены');
-          return { data: { transactions: [], total: 0 } };
-        }),
         axios.get('/auth/bitrix/bonus-balance').catch(err => {
           console.log('Не удалось получить баланс из Bitrix:', err.response?.data?.error);
           return { data: { success: false, bonus_balance: 0 } };
+        }),
+        axios.get('/auth/bitrix/bonus-history', { params: { limit: 50 } }).catch(err => {
+          console.log('Не удалось получить историю из Bitrix:', err.response?.data?.error);
+          return { data: { success: false, transactions: [], total: 0 } };
         }),
       ]);
       
@@ -57,9 +57,37 @@ export default function Loyalty() {
         console.log('✅ Баланс из Bitrix:', balanceData.points_balance);
       }
       
+      // Если есть история из Bitrix, используем её
+      let transactionsData = [];
+      let totalTransactions = 0;
+      
+      if (bitrixHistoryRes.data.success && bitrixHistoryRes.data.transactions.length > 0) {
+        // Преобразуем транзакции из Bitrix в формат, ожидаемый frontend
+        transactionsData = bitrixHistoryRes.data.transactions.map(tx => ({
+          id: tx.date, // используем дату как ID
+          created_at: tx.date,
+          transaction_type: tx.type,
+          currency: 'points',
+          amount: tx.amount,
+          description: tx.description,
+          balance_after: tx.balance,
+          expires_at: tx.expires_at,
+          valid_days: tx.valid_days
+        }));
+        totalTransactions = bitrixHistoryRes.data.total;
+        console.log('✅ История из Bitrix:', transactionsData.length, 'транзакций');
+      } else {
+        // Fallback на локальные транзакции
+        const localTransactions = await axios.get(`/loyalty/transactions?page=${page}&page_size=10`).catch(err => {
+          return { data: { transactions: [], total: 0 } };
+        });
+        transactionsData = localTransactions.data.transactions || [];
+        totalTransactions = localTransactions.data.total || 0;
+      }
+      
       setBalance(balanceData);
-      setTransactions(transactionsRes.data.transactions || []);
-      setTotalPages(Math.ceil((transactionsRes.data.total || 0) / 10));
+      setTransactions(transactionsData);
+      setTotalPages(Math.ceil(totalTransactions / 10));
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
     } finally {
@@ -73,6 +101,8 @@ export default function Loyalty() {
         return 'success';
       case 'deduction':
         return 'error';
+      case 'expiration':
+        return 'warning';
       case 'refund':
         return 'info';
       default:
@@ -86,10 +116,10 @@ export default function Loyalty() {
         return 'Начисление';
       case 'deduction':
         return 'Списание';
-      case 'refund':
-        return 'Возврат';
       case 'expiration':
         return 'Сгорание';
+      case 'refund':
+        return 'Возврат';
       default:
         return type;
     }

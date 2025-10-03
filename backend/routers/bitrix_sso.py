@@ -182,3 +182,78 @@ async def get_bitrix_bonus_balance(
             "bonus_balance": 0
         }
 
+
+@router.get("/bonus-history")
+async def get_bitrix_bonus_history(
+    limit: int = 50,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Получает историю бонусных транзакций из личного кабинета Bitrix"""
+    
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Проверяем что у пользователя есть bitrix_id
+        if not current_user.bitrix_id:
+            return {
+                "success": False,
+                "error": "Пользователь не привязан к Bitrix",
+                "transactions": [],
+                "total": 0
+            }
+        
+        logger.info(f"📜 Запрос истории бонусов для пользователя: bitrix_id={current_user.bitrix_id}")
+        
+        # Запрашиваем историю у Bitrix
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{settings.bitrix_domain}/local/api/get_bonus_history.php",
+                json={"user_id": current_user.bitrix_id, "limit": limit},
+                timeout=10.0
+            )
+            response.raise_for_status()
+            result = response.json()
+        
+        logger.info(f"📥 Ответ Bitrix: получено {len(result.get('transactions', []))} транзакций")
+        
+        if not result.get('success'):
+            logger.error(f"❌ Bitrix вернул ошибку: {result.get('error')}")
+            return {
+                "success": False,
+                "error": result.get('error', 'Unknown error'),
+                "transactions": [],
+                "total": 0
+            }
+        
+        transactions = result.get('transactions', [])
+        total = result.get('total', 0)
+        
+        logger.info(f"✅ История бонусов получена: {total} транзакций всего")
+        
+        return {
+            "success": True,
+            "transactions": transactions,
+            "total": total,
+            "current_balance": result.get('current_balance', 0),
+            "source": "bitrix"
+        }
+        
+    except httpx.HTTPError as e:
+        logger.error(f"❌ Ошибка связи с Bitrix: {str(e)}", exc_info=True)
+        return {
+            "success": False,
+            "error": f"Ошибка связи с Bitrix: {str(e)}",
+            "transactions": [],
+            "total": 0
+        }
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения истории: {str(e)}", exc_info=True)
+        return {
+            "success": False,
+            "error": f"Внутренняя ошибка: {str(e)}",
+            "transactions": [],
+            "total": 0
+        }
+
