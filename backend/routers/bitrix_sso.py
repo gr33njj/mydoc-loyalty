@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import httpx
@@ -8,7 +7,7 @@ import secrets
 from database import get_db
 from config import settings
 from models import User
-from routers.auth import create_access_token, get_password_hash
+from routers.auth import create_access_token, get_password_hash, get_current_active_user
 
 router = APIRouter()
 
@@ -115,4 +114,72 @@ async def verify_bitrix_token(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Внутренняя ошибка: {str(e)}"
         )
+
+
+@router.get("/bonus-balance")
+async def get_bitrix_bonus_balance(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Получает актуальный баланс бонусов из личного кабинета Bitrix"""
+    
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Проверяем что у пользователя есть bitrix_id
+        if not current_user.bitrix_id:
+            return {
+                "success": False,
+                "error": "Пользователь не привязан к Bitrix",
+                "bonus_balance": 0
+            }
+        
+        logger.info(f"💰 Запрос баланса бонусов для пользователя: bitrix_id={current_user.bitrix_id}")
+        
+        # Запрашиваем баланс у Bitrix
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{settings.bitrix_domain}/local/api/get_bonuses.php",
+                json={"user_id": current_user.bitrix_id},
+                timeout=10.0
+            )
+            response.raise_for_status()
+            result = response.json()
+        
+        logger.info(f"📥 Ответ Bitrix: {result}")
+        
+        if not result.get('success'):
+            logger.error(f"❌ Bitrix вернул ошибку: {result.get('error')}")
+            return {
+                "success": False,
+                "error": result.get('error', 'Unknown error'),
+                "bonus_balance": 0
+            }
+        
+        bonus_balance = float(result.get('bonus_balance', 0))
+        
+        logger.info(f"✅ Баланс бонусов получен: {bonus_balance} руб.")
+        
+        return {
+            "success": True,
+            "bonus_balance": bonus_balance,
+            "currency": result.get('currency', 'RUB'),
+            "source": "bitrix"
+        }
+        
+    except httpx.HTTPError as e:
+        logger.error(f"❌ Ошибка связи с Bitrix: {str(e)}", exc_info=True)
+        return {
+            "success": False,
+            "error": f"Ошибка связи с Bitrix: {str(e)}",
+            "bonus_balance": 0
+        }
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения баланса: {str(e)}", exc_info=True)
+        return {
+            "success": False,
+            "error": f"Внутренняя ошибка: {str(e)}",
+            "bonus_balance": 0
+        }
 
