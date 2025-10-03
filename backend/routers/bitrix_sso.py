@@ -51,21 +51,33 @@ async def verify_bitrix_token(
         user_data = result['user']
         bitrix_id = str(user_data['bitrix_id'])
         email = user_data['email']
+        name = user_data.get('name', '')
+        last_name = user_data.get('last_name', '')
+        full_name = f"{name} {last_name}".strip() or email.split('@')[0]
+        
+        logger.info(f"👤 Пользователь Bitrix: ID={bitrix_id}, Email={email}, ФИО={full_name}")
         
         # Ищем или создаем пользователя
         user = db.query(User).filter(User.bitrix_id == bitrix_id).first()
         
         if not user:
+            logger.info(f"🔍 Пользователь с bitrix_id={bitrix_id} не найден, проверяем по email...")
             # Проверяем по email
             user = db.query(User).filter(User.email == email).first()
             
             if user:
+                logger.info(f"✅ Найден пользователь по email, привязываем bitrix_id")
                 # Привязываем существующего пользователя
                 user.bitrix_id = bitrix_id
+                # Обновляем ФИО если оно было пустым
+                if not user.full_name or user.full_name == email.split('@')[0]:
+                    user.full_name = full_name
             else:
+                logger.info(f"🆕 Создаем нового пользователя: {email}")
                 # Создаем нового пользователя
                 user = User(
                     email=email,
+                    full_name=full_name,
                     password_hash=get_password_hash(secrets.token_urlsafe(16)),
                     bitrix_id=bitrix_id,
                     role="patient"
@@ -74,6 +86,9 @@ async def verify_bitrix_token(
             db.add(user)
             db.commit()
             db.refresh(user)
+            logger.info(f"✅ Пользователь сохранен: ID={user.id}, Email={user.email}")
+        else:
+            logger.info(f"✅ Пользователь найден по bitrix_id: ID={user.id}")
         
         # Генерируем JWT токен (используем ID как в обычном login)
         access_token = create_access_token(data={"sub": str(user.id)})
@@ -89,11 +104,13 @@ async def verify_bitrix_token(
         }
         
     except httpx.HTTPError as e:
+        logger.error(f"❌ Ошибка связи с Bitrix: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка связи с Bitrix: {str(e)}"
         )
     except Exception as e:
+        logger.error(f"❌ Внутренняя ошибка SSO: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Внутренняя ошибка: {str(e)}"
