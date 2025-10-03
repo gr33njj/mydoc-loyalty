@@ -15,6 +15,8 @@ import {
   Chip,
   CircularProgress,
   Pagination,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import Layout from '../components/Layout';
 import axios from 'axios';
@@ -27,6 +29,8 @@ export default function Loyalty() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   useEffect(() => {
     fetchLoyaltyData();
@@ -205,52 +209,120 @@ export default function Loyalty() {
             </Box>
           ) : (
             <>
-              <TableContainer component={Paper} variant="outlined" sx={{ mt: 2 }}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Дата</TableCell>
-                      <TableCell>Тип</TableCell>
-                      <TableCell>Описание</TableCell>
-                      <TableCell>Валюта</TableCell>
-                      <TableCell align="right">Сумма</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {transactions.map((transaction) => (
-                      <TableRow key={transaction.id}>
-                        <TableCell>
-                          {format(new Date(transaction.created_at), 'dd MMM yyyy, HH:mm', { locale: ru })}
-                        </TableCell>
-                        <TableCell>
+              {/* Мобильная версия - карточки */}
+              {isMobile ? (
+                <Box sx={{ mt: 2 }}>
+                  {transactions.map((transaction) => (
+                    <Card key={transaction.id} variant="outlined" sx={{ mb: 2 }}>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                           <Chip
                             label={getTransactionLabel(transaction.transaction_type)}
                             color={getTransactionColor(transaction.transaction_type)}
                             size="small"
                           />
-                        </TableCell>
-                        <TableCell>{transaction.description}</TableCell>
-                        <TableCell>
-                          <Chip
-                            label={transaction.currency === 'points' ? 'Баллы' : 'Кешбэк'}
-                            size="small"
-                            variant="outlined"
-                          />
-                        </TableCell>
-                        <TableCell align="right">
                           <Typography
                             fontWeight="bold"
+                            fontSize="1.2rem"
                             color={transaction.transaction_type === 'accrual' ? 'success.main' : 'error.main'}
                           >
                             {transaction.transaction_type === 'accrual' ? '+' : '-'}
                             {transaction.amount.toFixed(2)}
                           </Typography>
-                        </TableCell>
+                        </Box>
+                        
+                        <Typography variant="body2" color="text.secondary" gutterBottom>
+                          {transaction.description}
+                        </Typography>
+                        
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            {format(new Date(transaction.created_at), 'dd MMM yyyy, HH:mm', { locale: ru })}
+                          </Typography>
+                          <Chip
+                            label={transaction.currency === 'points' ? 'Баллы' : 'Кешбэк'}
+                            size="small"
+                            variant="outlined"
+                          />
+                        </Box>
+                        
+                        {transaction.balance_after !== undefined && (
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                            Баланс: {transaction.balance_after.toFixed(2)}
+                          </Typography>
+                        )}
+                        
+                        {transaction.expires_at && (
+                          <Typography variant="caption" color="warning.main" display="block" sx={{ mt: 0.5 }}>
+                            Действительны до {format(new Date(transaction.expires_at), 'dd MMM yyyy', { locale: ru })}
+                          </Typography>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Box>
+              ) : (
+                /* Десктопная версия - таблица */
+                <TableContainer component={Paper} variant="outlined" sx={{ mt: 2 }}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Дата</TableCell>
+                        <TableCell>Тип</TableCell>
+                        <TableCell>Описание</TableCell>
+                        <TableCell>Валюта</TableCell>
+                        <TableCell align="right">Сумма</TableCell>
+                        <TableCell align="right">Баланс</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                    </TableHead>
+                    <TableBody>
+                      {transactions.map((transaction) => (
+                        <TableRow key={transaction.id}>
+                          <TableCell>
+                            {format(new Date(transaction.created_at), 'dd MMM yyyy, HH:mm', { locale: ru })}
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={getTransactionLabel(transaction.transaction_type)}
+                              color={getTransactionColor(transaction.transaction_type)}
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {transaction.description}
+                            {transaction.expires_at && (
+                              <Typography variant="caption" display="block" color="text.secondary">
+                                до {format(new Date(transaction.expires_at), 'dd MMM yyyy', { locale: ru })}
+                              </Typography>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={transaction.currency === 'points' ? 'Баллы' : 'Кешбэк'}
+                              size="small"
+                              variant="outlined"
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography
+                              fontWeight="bold"
+                              color={transaction.transaction_type === 'accrual' ? 'success.main' : 'error.main'}
+                            >
+                              {transaction.transaction_type === 'accrual' ? '+' : '-'}
+                              {transaction.amount.toFixed(2)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography variant="body2" color="text.secondary">
+                              {transaction.balance_after !== undefined ? transaction.balance_after.toFixed(2) : '-'}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
 
               {totalPages > 1 && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
