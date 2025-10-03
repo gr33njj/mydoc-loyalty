@@ -35,8 +35,14 @@ export default function Loyalty() {
   const fetchLoyaltyData = async () => {
     try {
       const [balanceRes, transactionsRes, bitrixBalanceRes] = await Promise.all([
-        axios.get('/loyalty/balance'),
-        axios.get(`/loyalty/transactions?page=${page}&page_size=10`),
+        axios.get('/loyalty/balance').catch(err => {
+          console.log('Локальный баланс не найден (нормально для SSO пользователей)');
+          return { data: { points_balance: 0, cashback_balance: 0, card_tier: 'Bronze', transactions_count: 0 } };
+        }),
+        axios.get(`/loyalty/transactions?page=${page}&page_size=10`).catch(err => {
+          console.log('Транзакции не найдены');
+          return { data: { transactions: [], total: 0 } };
+        }),
         axios.get('/auth/bitrix/bonus-balance').catch(err => {
           console.log('Не удалось получить баланс из Bitrix:', err.response?.data?.error);
           return { data: { success: false, bonus_balance: 0 } };
@@ -48,11 +54,12 @@ export default function Loyalty() {
       // Если есть баланс из Bitrix, используем его для бонусных баллов
       if (bitrixBalanceRes.data.success) {
         balanceData.points_balance = bitrixBalanceRes.data.bonus_balance;
+        console.log('✅ Баланс из Bitrix:', balanceData.points_balance);
       }
       
       setBalance(balanceData);
-      setTransactions(transactionsRes.data.transactions);
-      setTotalPages(Math.ceil(transactionsRes.data.total / 10));
+      setTransactions(transactionsRes.data.transactions || []);
+      setTotalPages(Math.ceil((transactionsRes.data.total || 0) / 10));
     } catch (error) {
       console.error('Ошибка загрузки данных:', error);
     } finally {

@@ -30,7 +30,10 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     try {
       const [balanceRes, statsRes, certsRes, bitrixBalanceRes] = await Promise.all([
-        axios.get('/loyalty/balance'),
+        axios.get('/loyalty/balance').catch(err => {
+          console.log('Локальный баланс не найден (нормально для SSO пользователей)');
+          return { data: { points_balance: 0, cashback_balance: 0, card_tier: 'Bronze', transactions_count: 0 } };
+        }),
         axios.get('/referrals/stats'),
         axios.get('/certificates/my'),
         axios.get('/auth/bitrix/bonus-balance').catch(err => {
@@ -44,6 +47,7 @@ export default function Dashboard() {
       // Если есть баланс из Bitrix, используем его для бонусных баллов
       if (bitrixBalanceRes.data.success) {
         balanceData.points_balance = bitrixBalanceRes.data.bonus_balance;
+        console.log('✅ Баланс из Bitrix:', balanceData.points_balance);
       }
       
       setBalance(balanceData);
