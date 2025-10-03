@@ -44,55 +44,94 @@ if (empty($userId)) {
     exit;
 }
 
-// Загружаем модуль sale (если бонусы там хранятся)
-\Bitrix\Main\Loader::includeModule('sale');
-
 try {
-    // ВАРИАНТ 1: Если бонусы хранятся в пользовательских полях
-    $user = \Bitrix\Main\UserTable::getById($userId)->fetch();
+    // Получаем данные пользователя с полем UF_USER__BONUSES_JSON
+    $rsUser = CUser::GetList(
+        [], 
+        [], 
+        ['ID' => $userId], 
+        ['SELECT' => ['ID', 'UF_USER__BONUSES_JSON']]
+    );
     
-    if (!$user) {
+    $arUser = $rsUser->Fetch();
+    
+    if (!$arUser) {
         throw new Exception('Пользователь не найден');
     }
     
-    // Получаем бонусный баланс
-    // ВНИМАНИЕ: Замените 'UF_BONUS_BALANCE' на реальное название поля в вашей системе!
-    // Возможные варианты:
-    // - UF_BONUS_POINTS
-    // - UF_LOYALTY_BALANCE
-    // - или другое пользовательское поле
-    
     $bonusBalance = 0;
+    $bonuses_stack = [];
     
-    // Попробуем найти поле с бонусами
-    if (isset($user['UF_BONUS_BALANCE'])) {
-        $bonusBalance = floatval($user['UF_BONUS_BALANCE']);
-    } elseif (isset($user['UF_BONUS_POINTS'])) {
-        $bonusBalance = floatval($user['UF_BONUS_POINTS']);
-    } elseif (isset($user['UF_LOYALTY_BALANCE'])) {
-        $bonusBalance = floatval($user['UF_LOYALTY_BALANCE']);
+    // Если есть JSON с бонусами - рассчитываем баланс
+    if (!empty($arUser['UF_USER__BONUSES_JSON'])) {
+        $bonus_list = json_decode($arUser['UF_USER__BONUSES_JSON'], true);
+        
+        foreach (($bonus_list ?? []) as $bonus) {
+            // Начисление
+            if ($bonus['RecordType'] === 'Receipt') {
+                // Проверяем нет ли на дату текущего начисления просроченных прежних начислений
+                while ($stack_bonus = array_pop($bonuses_stack)) {
+                    if (!empty($stack_bonus['WRITE_OFF_DATE']) && $stack_bonus['WRITE_OFF_DATE'] < strtotime($bonus['Period'])) {
+                        $bonusBalance -= $stack_bonus['Накопление'];
+                    } else {
+                        array_push($bonuses_stack, $stack_bonus);
+                        break;
+                    }
+                }
+                
+                $bonusBalance += $bonus['Накопление'];
+                array_push($bonuses_stack, $bonus);
+                
+            // Списание
+            } elseif ($bonus['RecordType'] === 'Expense') {
+                $bonusBalance -= $bonus['Накопление'];
+                $bonus_balance_to_write_off = $bonus['Накопление'];
+                
+                $counter = 0;
+                while ($stack_bonus = array_pop($bonuses_stack)) {
+                    $counter++;
+                    
+                    // Проверяем не просрочен ли бонус
+                    if (!empty($stack_bonus['WRITE_OFF_DATE']) && $stack_bonus['WRITE_OFF_DATE'] < strtotime($bonus['Period'])) {
+                        $bonusBalance -= $stack_bonus['Накопление'];
+                    } else {
+                        // Если в начислении баллов больше чем нужно списать
+                        if ($stack_bonus['Накопление'] > $bonus_balance_to_write_off) {
+                            $stack_bonus['Накопление'] -= $bonus_balance_to_write_off;
+                            $bonus_balance_to_write_off = 0;
+                            array_push($bonuses_stack, $stack_bonus);
+                        }
+                        // Если баллы совпадают
+                        if ($stack_bonus['Накопление'] === $bonus_balance_to_write_off) {
+                            $bonus_balance_to_write_off = 0;
+                        } else {
+                            // Если баллов меньше
+                            $bonus_balance_to_write_off -= $stack_bonus['Накопление'];
+                        }
+                    }
+                    
+                    if ($bonus_balance_to_write_off <= 0) break;
+                    if ($counter > 100000) {
+                        throw new Exception('Ошибка в расчете бонусов');
+                    }
+                }
+            }
+        }
+        
+        // Проверяем просроченные начисления на текущую дату
+        if (!empty($bonuses_stack)) {
+            while ($stack_bonus = array_pop($bonuses_stack)) {
+                if (!empty($stack_bonus['WRITE_OFF_DATE']) && $stack_bonus['WRITE_OFF_DATE'] < time()) {
+                    $bonusBalance -= $stack_bonus['Накопление'];
+                }
+            }
+        }
     }
-    
-    // ВАРИАНТ 2: Если бонусы хранятся в модуле Sale (счет покупателя)
-    // Раскомментируйте если бонусы в Sale:
-    /*
-    $accounts = \Bitrix\Sale\Internals\UserAccountTable::getList([
-        'filter' => [
-            'USER_ID' => $userId,
-            'CURRENCY' => 'RUB' // или другая валюта
-        ]
-    ])->fetch();
-    
-    if ($accounts) {
-        $bonusBalance = floatval($accounts['CURRENT_BUDGET']);
-    }
-    */
     
     echo json_encode([
         'success' => true,
         'user_id' => $userId,
-        'bonus_balance' => $bonusBalance,
-        'currency' => 'RUB'
+        'bonus_balance' => $bonusBalance
     ], JSON_UNESCAPED_UNICODE);
     
 } catch (Exception $e) {

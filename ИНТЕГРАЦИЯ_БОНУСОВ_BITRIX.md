@@ -88,7 +88,7 @@ curl -X POST https://mydoctorarmavir.ru/local/api/get_bonuses.php \
   -d '{"user_id": 1}'
 
 # Ожидаемый ответ:
-# {"success":true,"user_id":"1","bonus_balance":150.50,"currency":"RUB"}
+# {"success":true,"user_id":"1","bonus_balance":150}
 ```
 
 ```bash
@@ -119,8 +119,7 @@ curl -X GET https://it-mydoc.ru/api/auth/bitrix/bonus-balance \
 # Ожидаемый ответ:
 # {
 #   "success": true,
-#   "bonus_balance": 150.50,
-#   "currency": "RUB",
+#   "bonus_balance": 150,
 #   "source": "bitrix"
 # }
 ```
@@ -215,10 +214,11 @@ curl -X POST https://mydoctorarmavir.ru/local/api/get_bonuses.php \
 {
   "success": true,
   "user_id": "1",
-  "bonus_balance": 150.50,
-  "currency": "RUB"
+  "bonus_balance": 150
 }
 ```
+
+**Примечание:** `bonus_balance` - это количество бонусных баллов (без валюты). Баланс рассчитывается с учетом всех начислений, списаний и сгораний по той же логике, что используется на странице `/personal/bonuses/`.
 
 ### 2. Проверьте микросервис
 
