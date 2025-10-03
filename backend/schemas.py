@@ -9,7 +9,7 @@ from models import TransactionType, CertificateStatus, ReferralEventType, Reward
 class UserBase(BaseModel):
     email: EmailStr
     phone: Optional[str] = None
-    full_name: str
+    full_name: Optional[str] = None  # Опционально для совместимости со старыми пользователями
 
 
 class UserCreate(UserBase):
