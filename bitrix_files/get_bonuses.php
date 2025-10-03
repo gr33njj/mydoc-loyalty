@@ -128,6 +128,9 @@ try {
         }
     }
     
+    // Округляем до 2 знаков после запятой
+    $bonusBalance = round($bonusBalance, 2);
+    
     echo json_encode([
         'success' => true,
         'user_id' => $userId,

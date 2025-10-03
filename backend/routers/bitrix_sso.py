@@ -157,7 +157,7 @@ async def get_bitrix_bonus_balance(
                 "bonus_balance": 0
             }
         
-        bonus_balance = float(result.get('bonus_balance', 0))
+        bonus_balance = round(float(result.get('bonus_balance', 0)), 2)
         
         logger.info(f"✅ Баланс бонусов получен: {bonus_balance} баллов")
         
