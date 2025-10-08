@@ -13,6 +13,7 @@ router = APIRouter()
 
 class TokenVerifyRequest(BaseModel):
     token: str
+    referral_code: str = None  # Реферальный код (опционально)
 
 @router.post("/verify-token")
 async def verify_bitrix_token(
@@ -58,6 +59,7 @@ async def verify_bitrix_token(
         
         # Ищем или создаем пользователя
         user = db.query(User).filter(User.bitrix_id == bitrix_id).first()
+        is_new_user = False
         
         if not user:
             logger.info(f"🔍 Пользователь с bitrix_id={bitrix_id} не найден, проверяем по email...")
@@ -73,6 +75,7 @@ async def verify_bitrix_token(
                     user.full_name = full_name
             else:
                 logger.info(f"🆕 Создаем нового пользователя: {email}")
+                is_new_user = True
                 # Создаем нового пользователя
                 user = User(
                     email=email,
@@ -88,6 +91,38 @@ async def verify_bitrix_token(
             logger.info(f"✅ Пользователь сохранен: ID={user.id}, Email={user.email}")
         else:
             logger.info(f"✅ Пользователь найден по bitrix_id: ID={user.id}")
+        
+        # Обработка реферального кода, если указан И это новый пользователь
+        if request.referral_code and is_new_user:
+            from models import ReferralCode, ReferralEvent, ReferralEventType
+            
+            logger.info(f"🎯 Обработка реферального кода: {request.referral_code}")
+            
+            referral_code = db.query(ReferralCode).filter(
+                ReferralCode.code == request.referral_code,
+                ReferralCode.is_active == True
+            ).first()
+            
+            if referral_code and referral_code.user_id != user.id:
+                # Создание реферального события "registration"
+                event = ReferralEvent(
+                    referral_code_id=referral_code.id,
+                    referred_user_id=user.id,
+                    event_type=ReferralEventType.REGISTRATION,
+                    processed=False
+                )
+                db.add(event)
+                
+                # Обновление статистики реферального кода
+                referral_code.total_referrals += 1
+                
+                db.commit()
+                logger.info(f"✅ Пользователь {user.email} зарегистрирован по реферальному коду {request.referral_code}")
+                logger.info(f"👥 Реферер: user_id={referral_code.user_id}, всего рефералов: {referral_code.total_referrals}")
+            elif referral_code and referral_code.user_id == user.id:
+                logger.warning(f"⚠️ Пользователь попытался использовать свой собственный реферальный код")
+            else:
+                logger.warning(f"⚠️ Реферальный код {request.referral_code} не найден или неактивен")
         
         # Генерируем JWT токен (используем ID как в обычном login)
         access_token = create_access_token(data={"sub": str(user.id)})

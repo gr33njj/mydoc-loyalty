@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Box,
@@ -9,13 +9,25 @@ import {
   Divider,
   Stack,
   CircularProgress,
+  Alert,
 } from '@mui/material';
+import { useSearchParams } from 'react-router-dom';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
 import axios from 'axios';
 
 export default function Login() {
   const [loading, setLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const referralCode = searchParams.get('ref');
+
+  useEffect(() => {
+    // Сохраняем реферальный код в localStorage перед редиректом на Bitrix
+    if (referralCode) {
+      localStorage.setItem('pending_referral_code', referralCode);
+      console.log('💾 Реферальный код сохранен для SSO:', referralCode);
+    }
+  }, [referralCode]);
 
   const handleBitrixLogin = () => {
     // Редирект на промежуточную страницу Bitrix
@@ -104,6 +116,18 @@ export default function Login() {
                 Программа лояльности медицинского центра
               </Typography>
             </Box>
+
+            {/* Информация о реферальной ссылке */}
+            {referralCode && (
+              <Alert severity="success" icon="🎉" sx={{ mb: 2 }}>
+                <Typography variant="body2" fontWeight="600">
+                  Вы переходите по реферальной ссылке!
+                </Typography>
+                <Typography variant="caption">
+                  Код: <strong>{referralCode}</strong> — будет применен после авторизации
+                </Typography>
+              </Alert>
+            )}
 
             {/* Основная кнопка SSO */}
             <Stack spacing={2}>

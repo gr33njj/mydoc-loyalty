@@ -22,13 +22,26 @@ export default function SSORedirect() {
       try {
         console.log('🔄 Проверка токена от Bitrix:', token);
         
+        // Проверяем наличие сохраненного реферального кода
+        const pendingReferralCode = localStorage.getItem('pending_referral_code');
+        if (pendingReferralCode) {
+          console.log('🎯 Найден реферальный код для применения:', pendingReferralCode);
+        }
+        
         const response = await axios.post('/auth/bitrix/verify-token', {
-          token: token
+          token: token,
+          referral_code: pendingReferralCode || undefined
         });
 
         console.log('📥 Ответ от backend:', response.data);
 
         if (response.data.success && response.data.token) {
+          // Удаляем использованный реферальный код
+          if (pendingReferralCode) {
+            localStorage.removeItem('pending_referral_code');
+            console.log('🗑️ Реферальный код использован и удален');
+          }
+          
           // Сохраняем JWT токен (как access_token для AuthContext)
           localStorage.setItem('access_token', response.data.token);
           console.log('✅ JWT токен сохранен:', response.data.token.substring(0, 50) + '...');
