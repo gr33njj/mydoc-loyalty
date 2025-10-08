@@ -49,14 +49,14 @@ export default function Referrals() {
   };
 
   const copyReferralLink = () => {
-    const link = `https://it-mydoc.ru/register?ref=${stats?.referral_code}`;
+    const link = `https://it-mydoc.ru/login?ref=${stats?.referral_code}`;
     navigator.clipboard.writeText(link);
     setSnackbarMessage('Реферальная ссылка скопирована!');
     setSnackbarOpen(true);
   };
 
   const shareReferralLink = async () => {
-    const link = `https://it-mydoc.ru/register?ref=${stats?.referral_code}`;
+    const link = `https://it-mydoc.ru/login?ref=${stats?.referral_code}`;
     const text = 'Присоединяйтесь к программе лояльности медицинского центра! Получите бонусы при регистрации.';
     
     if (navigator.share) {
@@ -127,7 +127,7 @@ export default function Referrals() {
             Ваш реферальный код
           </Typography>
           <Typography variant="body2" color="text.secondary" paragraph>
-            Поделитесь этим кодом с друзьями. Когда они зарегистрируются и совершат первый визит, вы получите бонусы!
+            Поделитесь этой ссылкой с друзьями. Когда они авторизуются через Мой Доктор по вашей ссылке, вы получите бонусы!
           </Typography>
           
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 2 }}>
