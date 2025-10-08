@@ -154,7 +154,7 @@ export default function Referrals() {
           </Box>
 
           <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-            Реферальная ссылка: https://it-mydoc.ru/register?ref={stats?.referral_code}
+            Реферальная ссылка: https://it-mydoc.ru/login?ref={stats?.referral_code}
           </Typography>
         </CardContent>
       </Card>
