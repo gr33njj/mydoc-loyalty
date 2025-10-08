@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import {
   Container,
   Box,
@@ -8,16 +8,13 @@ import {
   Typography,
   Divider,
   Stack,
-  CircularProgress,
   Alert,
 } from '@mui/material';
 import { useSearchParams } from 'react-router-dom';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
-import axios from 'axios';
 
 export default function Login() {
-  const [loading, setLoading] = useState(false);
   const [searchParams] = useSearchParams();
   const referralCode = searchParams.get('ref');
 
@@ -136,8 +133,7 @@ export default function Login() {
                 variant="contained"
                 size="large"
                 onClick={handleBitrixLogin}
-                disabled={loading}
-                startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <LocalHospitalIcon />}
+                startIcon={<LocalHospitalIcon />}
                 sx={{
                   py: 2,
                   fontSize: '1.1rem',
@@ -149,14 +145,10 @@ export default function Login() {
                     boxShadow: '0 6px 20px rgba(0, 65, 85, 0.4)',
                     transform: 'translateY(-2px)',
                   },
-                  '&:disabled': {
-                    background: 'linear-gradient(135deg, #004155 0%, #68cdd2 100%)',
-                    opacity: 0.7,
-                  },
                   transition: 'all 0.3s ease',
                 }}
               >
-                {loading ? 'Авторизация...' : 'Войти через Мой Доктор'}
+                Войти через Мой Доктор
               </Button>
 
               <Typography 
