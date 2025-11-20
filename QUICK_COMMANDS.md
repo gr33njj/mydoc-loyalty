@@ -183,3 +183,10 @@ docker inspect <container_name>
 
 Полная документация в файле: `/tmp/mydoc-loyalty/AUTOMATION.md`
 
+
+
+
+
+
+
+
