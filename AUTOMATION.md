@@ -309,3 +309,10 @@ docker-compose pull
 
 Все скрипты автоматизации находятся в `/tmp/mydoc-loyalty/`
 
+
+
+
+
+
+
+
