@@ -2,10 +2,12 @@
 Роутер онлайн-записи к врачам.
 
 Архитектура:
-  - Список врачей и услуг: сначала возвращаем статические данные,
-    после подключения VPN+1С они будут подтягиваться из 1С REST API.
-  - Заявка сохраняется локально в БД.
-  - После подключения к 1С заявка пробрасывается туда же.
+  - Список врачей: из Catalog_Сотрудники (1С OData), fallback — статика
+  - Список услуг: из Catalog_Номенклатура (1С OData), fallback — статика
+  - Создание заявки: POST в Document_Заявка (1С OData) + сохранение в БД
+  - Клиент в 1С ищется по Catalog_Клиенты.phone
+  - ONEC_API_URL формат: http://192.168.100.234/BITtest
+                          (базовая часть без /odata/...)
 """
 from __future__ import annotations
 
@@ -121,69 +123,202 @@ STATIC_SERVICES: list[dict] = [
 ]
 
 
+def _odata_url(entity: str) -> str:
+    """Строит URL до OData-сущности 1С."""
+    base = (settings.ONEC_API_URL or "").rstrip("/")
+    return f"{base}/odata/standard.odata/{entity}"
+
+
+def _odata_auth() -> tuple[str, str]:
+    return (settings.ONEC_USERNAME or "", settings.ONEC_PASSWORD or "")
+
+
 async def _fetch_doctors_from_1c() -> list[dict] | None:
-    """Пытается получить список врачей из 1С. Возвращает None если недоступен."""
+    """Список врачей из Catalog_Сотрудники (1С OData)."""
     if not settings.ONEC_API_URL:
         return None
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        params = {
+            "$filter": "IsFolder eq false and DeletionMark eq false",
+            "$select": "Ref_Key,Description",
+            "$format": "json",
+            "$orderby": "Description",
+        }
+        async with httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.get(
-                f"{settings.ONEC_API_URL}/hs/loyalty/v1/doctors",
-                auth=(settings.ONEC_USERNAME, settings.ONEC_PASSWORD),
+                _odata_url("Catalog_%D0%A1%D0%BE%D1%82%D1%80%D1%83%D0%B4%D0%BD%D0%B8%D0%BA%D0%B8"),
+                params=params,
+                auth=_odata_auth(),
             )
             resp.raise_for_status()
-            return resp.json()
+            data = resp.json()
+        return [
+            {
+                "id": v["Ref_Key"],
+                "name": v.get("Description", ""),
+                "specialty": "",   # Специализация требует отдельного запроса
+                "photo_url": None,
+            }
+            for v in data.get("value", [])
+            if v.get("Description", "").strip()
+        ]
     except Exception as e:
         logger.warning(f"Не удалось получить врачей из 1С: {e}")
         return None
 
 
 async def _fetch_services_from_1c() -> list[dict] | None:
-    """Пытается получить список услуг из 1С. Возвращает None если недоступен."""
+    """Список услуг из Catalog_Номенклатура (1С OData)."""
     if not settings.ONEC_API_URL:
         return None
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        params = {
+            "$filter": "IsFolder eq false and DeletionMark eq false",
+            "$select": "Ref_Key,Description",
+            "$format": "json",
+            "$top": "200",
+            "$orderby": "Description",
+        }
+        async with httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.get(
-                f"{settings.ONEC_API_URL}/hs/loyalty/v1/services",
-                auth=(settings.ONEC_USERNAME, settings.ONEC_PASSWORD),
+                _odata_url("Catalog_%D0%9D%D0%BE%D0%BC%D0%B5%D0%BD%D0%BA%D0%BB%D0%B0%D1%82%D1%83%D1%80%D0%B0"),
+                params=params,
+                auth=_odata_auth(),
             )
             resp.raise_for_status()
-            return resp.json()
+            data = resp.json()
+        return [
+            {
+                "id": v["Ref_Key"],
+                "name": v.get("Description", ""),
+                "category": "Услуги",
+                "duration_min": 30,
+            }
+            for v in data.get("value", [])
+            if v.get("Description", "").strip()
+        ]
     except Exception as e:
         logger.warning(f"Не удалось получить услуги из 1С: {e}")
         return None
 
 
-async def _push_appointment_to_1c(appt: AppointmentRequest, user: User) -> str | None:
-    """Отправляет заявку в 1С и возвращает ID документа. None если недоступен."""
+async def _find_client_in_1c(user: User) -> str | None:
+    """Ищет клиента в Catalog_Клиенты по телефону или external_id."""
     if not settings.ONEC_API_URL:
         return None
     try:
-        payload = {
-            "patient_external_id": user.external_id or str(user.id),
-            "patient_name": user.full_name,
-            "patient_phone": user.phone,
-            "doctor_id": appt.doctor_id,
-            "doctor_name": appt.doctor_name,
-            "service_id": appt.service_id,
-            "service_name": appt.service_name,
-            "preferred_date": appt.preferred_date.isoformat() if appt.preferred_date else None,
-            "preferred_time_slot": appt.preferred_time_slot,
-            "comment": appt.comment,
-            "source": "loyalty_app",
-        }
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                f"{settings.ONEC_API_URL}/hs/loyalty/v1/appointments",
-                json=payload,
-                auth=(settings.ONEC_USERNAME, settings.ONEC_PASSWORD),
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            return data.get("document_id")
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            # Ищем по external_id если есть
+            if user.external_id:
+                resp = await client.get(
+                    _odata_url("Catalog_%D0%9A%D0%BB%D0%B8%D0%B5%D0%BD%D1%82%D1%8B"),
+                    params={
+                        "$filter": f"Code eq '{user.external_id}'",
+                        "$select": "Ref_Key",
+                        "$format": "json",
+                        "$top": "1",
+                    },
+                    auth=_odata_auth(),
+                )
+                if resp.status_code == 200:
+                    vals = resp.json().get("value", [])
+                    if vals:
+                        return vals[0]["Ref_Key"]
+            # Ищем по описанию (ФИО) — запасной вариант
+            if user.full_name:
+                resp = await client.get(
+                    _odata_url("Catalog_%D0%9A%D0%BB%D0%B8%D0%B5%D0%BD%D1%82%D1%8B"),
+                    params={
+                        "$filter": f"Description eq '{user.full_name}' and DeletionMark eq false",
+                        "$select": "Ref_Key",
+                        "$format": "json",
+                        "$top": "1",
+                    },
+                    auth=_odata_auth(),
+                )
+                if resp.status_code == 200:
+                    vals = resp.json().get("value", [])
+                    if vals:
+                        return vals[0]["Ref_Key"]
     except Exception as e:
-        logger.warning(f"Не удалось передать заявку в 1С: {e}")
+        logger.warning(f"Ошибка поиска клиента в 1С: {e}")
+    return None
+
+
+async def _push_appointment_to_1c(appt: AppointmentRequest, user: User) -> str | None:
+    """
+    Создаёт Document_Заявка в 1С через OData POST.
+    Возвращает Ref_Key созданного документа.
+    """
+    if not settings.ONEC_API_URL:
+        return None
+    try:
+        # Находим клиента в 1С
+        client_key = await _find_client_in_1c(user)
+        null_guid = "00000000-0000-0000-0000-000000000000"
+
+        # Формируем дату/время начала
+        dt_start = appt.preferred_date or datetime.now()
+        if appt.preferred_time_slot:
+            # "09:00–09:30" → берём начало
+            time_part = appt.preferred_time_slot.split("–")[0].split("-")[0].strip()
+            try:
+                h, m = map(int, time_part.split(":"))
+                dt_start = dt_start.replace(hour=h, minute=m, second=0, microsecond=0)
+            except Exception:
+                pass
+        dt_end = dt_start.replace(
+            hour=min(dt_start.hour + 0, 23),
+            minute=(dt_start.minute + 30) % 60,
+        )
+
+        payload = {
+            "Клиент_Key": client_key or null_guid,
+            "Сотрудник_Key": appt.doctor_id if appt.doctor_id and len(appt.doctor_id) == 36 else null_guid,
+            "ДатаНачала": dt_start.strftime("%Y-%m-%dT%H:%M:%S"),
+            "ДатаОкончания": dt_end.strftime("%Y-%m-%dT%H:%M:%S"),
+            "ВремяНачала": f"0001-01-01T{dt_start.strftime('%H:%M:%S')}",
+            "ВремяОкончания": f"0001-01-01T{dt_end.strftime('%H:%M:%S')}",
+            "КомментарийКлиента": appt.comment or "",
+            "Примечание": f"Запись через приложение Моя скидка. "
+                          f"Услуга: {appt.service_name or '—'}. "
+                          f"Пациент: {user.full_name or user.email}",
+            "СайтНомерЗаявки": "0",
+            "НесколькоСотрудников": False,
+        }
+
+        # Если выбрана услуга — добавляем в табличную часть Работы
+        if appt.service_id and len(appt.service_id) == 36:
+            payload["Работы"] = [{
+                "Номенклатура_Key": appt.service_id,
+                "ДатаНачала": dt_start.strftime("%Y-%m-%dT%H:%M:%S"),
+                "ДатаОкончания": dt_end.strftime("%Y-%m-%dT%H:%M:%S"),
+                "Продолжительность": f"0001-01-01T{dt_end.strftime('%H:%M:%S')}",
+                "Сотрудник_Key": payload["Сотрудник_Key"],
+                "Оборудование1_Key": null_guid,
+                "Оборудование2_Key": null_guid,
+                "Оборудование3_Key": null_guid,
+                "ПродолжительностьИзмененаВручную": False,
+            }]
+
+        async with httpx.AsyncClient(timeout=15.0) as http:
+            resp = await http.post(
+                _odata_url("Document_%D0%97%D0%B0%D1%8F%D0%B2%D0%BA%D0%B0"),
+                json=payload,
+                auth=_odata_auth(),
+                headers={"Content-Type": "application/json"},
+                params={"$format": "json"},
+            )
+            if resp.status_code in (200, 201):
+                data = resp.json()
+                ref_key = data.get("Ref_Key") or data.get("value", {}).get("Ref_Key")
+                logger.info(f"Заявка создана в 1С: {ref_key}")
+                return ref_key
+            else:
+                logger.warning(f"1С вернул {resp.status_code}: {resp.text[:300]}")
+                return None
+    except Exception as e:
+        logger.warning(f"Не удалось создать заявку в 1С: {e}")
         return None
 
 

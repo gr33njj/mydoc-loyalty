@@ -66,9 +66,18 @@ def _verify_token(x_webhook_token: Optional[str] = Header(None)):
     return x_webhook_token
 
 
+def _odata_url(entity: str) -> str:
+    base = (settings.ONEC_API_URL or "").rstrip("/")
+    return f"{base}/odata/standard.odata/{entity}"
+
+
+def _auth() -> tuple[str, str]:
+    return (settings.ONEC_USERNAME or "", settings.ONEC_PASSWORD or "")
+
+
 async def push_certificate_to_1c(cert: Certificate, db: Session) -> bool:
     """
-    Передаёт сертификат в 1С после его создания/обновления в нашей системе.
+    Создаёт/обновляет запись в Catalog_КартыСкидок в 1С.
     Возвращает True при успехе.
     """
     if not settings.ONEC_API_URL:
@@ -76,27 +85,36 @@ async def push_certificate_to_1c(cert: Certificate, db: Session) -> bool:
         return False
 
     owner: User | None = db.get(User, cert.owner_id)
+    null_guid = "00000000-0000-0000-0000-000000000000"
+
     payload = {
-        "code": cert.code,
-        "initial_amount": cert.initial_amount,
-        "current_amount": cert.current_amount,
-        "status": cert.status.value,
-        "valid_until": cert.valid_until.isoformat() if cert.valid_until else None,
-        "owner_phone": owner.phone if owner else None,
-        "owner_external_id": owner.external_id if owner else None,
-        "message": cert.message,
-        "source": "loyalty_app",
+        "Description": cert.code,
+        "Code": cert.code,
+        "ВладелецКарты_Key": owner.external_id if (owner and owner.external_id) else null_guid,
+        "СрокДействия": cert.valid_until.strftime("%Y-%m-%dT%H:%M:%S") if cert.valid_until else "0001-01-01T00:00:00",
+        "Примечание": f"Сертификат {cert.initial_amount} руб. Источник: loyalty_app",
     }
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
-                f"{settings.ONEC_API_URL}/hs/loyalty/v1/certificates",
+                _odata_url("Catalog_%D0%9A%D0%B0%D1%80%D1%82%D1%8B%D0%A1%D0%BA%D0%B8%D0%B4%D0%BE%D0%BA"),
                 json=payload,
-                auth=(settings.ONEC_USERNAME, settings.ONEC_PASSWORD),
+                auth=_auth(),
+                headers={"Content-Type": "application/json"},
+                params={"$format": "json"},
             )
-            resp.raise_for_status()
-            logger.info(f"Сертификат {cert.code} передан в 1С")
-            return True
+            if resp.status_code in (200, 201):
+                data = resp.json()
+                ref_key = data.get("Ref_Key")
+                if ref_key:
+                    extra = cert.extra_data or {}
+                    extra["onec_card_key"] = ref_key
+                    cert.extra_data = extra
+                    db.commit()
+                logger.info(f"Сертификат {cert.code} передан в 1С (key={ref_key})")
+                return True
+            logger.warning(f"1С вернул {resp.status_code}: {resp.text[:200]}")
+            return False
     except Exception as e:
         logger.warning(f"Ошибка передачи сертификата {cert.code} в 1С: {e}")
         return False
@@ -104,18 +122,26 @@ async def push_certificate_to_1c(cert: Certificate, db: Session) -> bool:
 
 async def sync_certificate_from_1c(code: str, db: Session) -> Certificate | None:
     """
-    Запрашивает актуальный остаток сертификата из 1С и обновляет локально.
+    Ищет Catalog_КартыСкидок по Description=code и обновляет local cert.
     """
     if not settings.ONEC_API_URL:
         return None
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.get(
-                f"{settings.ONEC_API_URL}/hs/loyalty/v1/certificates/{code}",
-                auth=(settings.ONEC_USERNAME, settings.ONEC_PASSWORD),
+                _odata_url("Catalog_%D0%9A%D0%B0%D1%80%D1%82%D1%8B%D0%A1%D0%BA%D0%B8%D0%B4%D0%BE%D0%BA"),
+                params={
+                    "$filter": f"Description eq '{code}' and DeletionMark eq false",
+                    "$format": "json",
+                    "$top": "1",
+                },
+                auth=_auth(),
             )
             resp.raise_for_status()
-            data = resp.json()
+            vals = resp.json().get("value", [])
+            if not vals:
+                return None
+            data = vals[0]
     except Exception as e:
         logger.warning(f"Не удалось получить сертификат {code} из 1С: {e}")
         return None
