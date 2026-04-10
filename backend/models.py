@@ -21,6 +21,13 @@ class CertificateStatus(str, enum.Enum):
     CANCELLED = "cancelled"  # Отменен
 
 
+class AppointmentStatus(str, enum.Enum):
+    PENDING = "pending"          # Ожидает подтверждения
+    CONFIRMED = "confirmed"      # Подтверждена
+    CANCELLED = "cancelled"      # Отменена
+    COMPLETED = "completed"      # Выполнена
+
+
 class ReferralEventType(str, enum.Enum):
     REGISTRATION = "registration"  # Регистрация
     FIRST_VISIT = "first_visit"  # Первый визит
@@ -301,6 +308,40 @@ class RewardRule(Base):
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+# === МОДЕЛИ ОНЛАЙН-ЗАПИСИ ===
+
+class AppointmentRequest(Base):
+    """Заявка на онлайн-запись к врачу"""
+    __tablename__ = "appointment_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+
+    # Выбор специалиста / услуги
+    doctor_id = Column(String, nullable=True)      # ID врача в 1С
+    doctor_name = Column(String, nullable=True)    # ФИО врача
+    service_id = Column(String, nullable=True)     # ID услуги в 1С
+    service_name = Column(String, nullable=True)   # Название услуги
+
+    # Время записи
+    preferred_date = Column(DateTime(timezone=True), nullable=True)
+    preferred_time_slot = Column(String, nullable=True)  # "09:00-09:30"
+
+    comment = Column(Text, nullable=True)
+
+    # Статус
+    status = Column(Enum(AppointmentStatus), default=AppointmentStatus.PENDING)
+
+    # Связь с 1С (заполняется после передачи в 1С)
+    onec_document_id = Column(String, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    user = relationship("User", backref="appointments")
 
 
 # === AUDIT LOG ===

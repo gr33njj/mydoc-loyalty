@@ -14,6 +14,7 @@ import Dashboard from './pages/Dashboard';
 import Loyalty from './pages/Loyalty';
 import Certificates from './pages/Certificates';
 import Referrals from './pages/Referrals';
+import Appointment from './pages/Appointment';
 
 // Цветовая схема клиники
 const theme = createTheme({
@@ -135,7 +136,13 @@ function App() {
                 <Referrals />
               </ProtectedRoute>
             } />
-            
+
+            <Route path="/appointment" element={
+              <ProtectedRoute>
+                <Appointment />
+              </ProtectedRoute>
+            } />
+
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Router>

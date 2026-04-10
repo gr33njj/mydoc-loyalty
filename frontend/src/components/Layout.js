@@ -20,11 +20,13 @@ import HomeIcon from '@mui/icons-material/Home';
 import LoyaltyIcon from '@mui/icons-material/Loyalty';
 import CardGiftcardIcon from '@mui/icons-material/CardGiftcard';
 import PeopleIcon from '@mui/icons-material/People';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const menuItems = [
   { text: 'Главная', icon: <HomeIcon />, path: '/' },
+  { text: 'Запись', icon: <EventAvailableIcon />, path: '/appointment' },
   { text: 'Бонусы', icon: <LoyaltyIcon />, path: '/loyalty' },
   { text: 'Сертификаты', icon: <CardGiftcardIcon />, path: '/certificates' },
   { text: 'Рефералы', icon: <PeopleIcon />, path: '/referrals' },

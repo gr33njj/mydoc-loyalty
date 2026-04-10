@@ -10,6 +10,7 @@ import os
 from config import settings
 from database import engine, Base
 from routers import loyalty, certificates, referrals, auth, admin, integrations, bitrix_sso
+from routers import appointments, onec_sync
 
 # Настройка логирования
 logging.basicConfig(
@@ -90,6 +91,8 @@ app.include_router(certificates.router, prefix="/api/certificates", tags=["Се�
 app.include_router(referrals.router, prefix="/api/referrals", tags=["Рефералы"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Администрирование"])
 app.include_router(integrations.router, prefix="/api/integrations", tags=["Интеграции"])
+app.include_router(appointments.router, prefix="/api/appointments", tags=["Онлайн-запись"])
+app.include_router(onec_sync.router, prefix="/api/integrations/1c", tags=["1С Синхронизация"])
 
 # Статические файлы (QR-коды и uploads)
 qrcode_dir = "/app/qrcodes"
