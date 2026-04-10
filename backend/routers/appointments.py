@@ -11,7 +11,8 @@
 """
 from __future__ import annotations
 
-from datetime import datetime
+import asyncio
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 import httpx
@@ -22,6 +23,7 @@ from sqlalchemy.orm import Session
 from config import settings
 from database import get_db
 from models import AppointmentRequest, AppointmentStatus, User
+from onec_utils import odata_auth, odata_url
 from routers.auth import get_current_user
 
 import logging
@@ -123,16 +125,6 @@ STATIC_SERVICES: list[dict] = [
 ]
 
 
-def _odata_url(entity: str) -> str:
-    """Строит URL до OData-сущности 1С."""
-    base = (settings.ONEC_API_URL or "").rstrip("/")
-    return f"{base}/odata/standard.odata/{entity}"
-
-
-def _odata_auth() -> tuple[str, str]:
-    return (settings.ONEC_USERNAME or "", settings.ONEC_PASSWORD or "")
-
-
 async def _fetch_doctors_from_1c() -> list[dict] | None:
     """Список врачей из Catalog_Сотрудники (1С OData)."""
     if not settings.ONEC_API_URL:
@@ -146,9 +138,9 @@ async def _fetch_doctors_from_1c() -> list[dict] | None:
         }
         async with httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.get(
-                _odata_url("Catalog_%D0%A1%D0%BE%D1%82%D1%80%D1%83%D0%B4%D0%BD%D0%B8%D0%BA%D0%B8"),
+                odata_url("Catalog_%D0%A1%D0%BE%D1%82%D1%80%D1%83%D0%B4%D0%BD%D0%B8%D0%BA%D0%B8"),
                 params=params,
-                auth=_odata_auth(),
+                auth=odata_auth(),
             )
             resp.raise_for_status()
             data = resp.json()
@@ -181,9 +173,9 @@ async def _fetch_services_from_1c() -> list[dict] | None:
         }
         async with httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.get(
-                _odata_url("Catalog_%D0%9D%D0%BE%D0%BC%D0%B5%D0%BD%D0%BA%D0%BB%D0%B0%D1%82%D1%83%D1%80%D0%B0"),
+                odata_url("Catalog_%D0%9D%D0%BE%D0%BC%D0%B5%D0%BD%D0%BA%D0%BB%D0%B0%D1%82%D1%83%D1%80%D0%B0"),
                 params=params,
-                auth=_odata_auth(),
+                auth=odata_auth(),
             )
             resp.raise_for_status()
             data = resp.json()
@@ -203,43 +195,35 @@ async def _fetch_services_from_1c() -> list[dict] | None:
 
 
 async def _find_client_in_1c(user: User) -> str | None:
-    """Ищет клиента в Catalog_Клиенты по телефону или external_id."""
+    """Ищет клиента в Catalog_Клиенты по external_id и ФИО параллельно."""
     if not settings.ONEC_API_URL:
         return None
+
+    async def _lookup(client: httpx.AsyncClient, filter_expr: str) -> str | None:
+        try:
+            resp = await client.get(
+                odata_url("Catalog_%D0%9A%D0%BB%D0%B8%D0%B5%D0%BD%D1%82%D1%8B"),
+                params={"$filter": filter_expr, "$select": "Ref_Key", "$format": "json", "$top": "1"},
+                auth=odata_auth(),
+            )
+            if resp.status_code == 200:
+                vals = resp.json().get("value", [])
+                return vals[0]["Ref_Key"] if vals else None
+        except Exception:
+            pass
+        return None
+
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
-            # Ищем по external_id если есть
+            filters = []
             if user.external_id:
-                resp = await client.get(
-                    _odata_url("Catalog_%D0%9A%D0%BB%D0%B8%D0%B5%D0%BD%D1%82%D1%8B"),
-                    params={
-                        "$filter": f"Code eq '{user.external_id}'",
-                        "$select": "Ref_Key",
-                        "$format": "json",
-                        "$top": "1",
-                    },
-                    auth=_odata_auth(),
-                )
-                if resp.status_code == 200:
-                    vals = resp.json().get("value", [])
-                    if vals:
-                        return vals[0]["Ref_Key"]
-            # Ищем по описанию (ФИО) — запасной вариант
+                filters.append(f"Code eq '{user.external_id}'")
             if user.full_name:
-                resp = await client.get(
-                    _odata_url("Catalog_%D0%9A%D0%BB%D0%B8%D0%B5%D0%BD%D1%82%D1%8B"),
-                    params={
-                        "$filter": f"Description eq '{user.full_name}' and DeletionMark eq false",
-                        "$select": "Ref_Key",
-                        "$format": "json",
-                        "$top": "1",
-                    },
-                    auth=_odata_auth(),
-                )
-                if resp.status_code == 200:
-                    vals = resp.json().get("value", [])
-                    if vals:
-                        return vals[0]["Ref_Key"]
+                filters.append(f"Description eq '{user.full_name}' and DeletionMark eq false")
+            if not filters:
+                return None
+            results = await asyncio.gather(*[_lookup(client, f) for f in filters])
+            return next((r for r in results if r), None)
     except Exception as e:
         logger.warning(f"Ошибка поиска клиента в 1С: {e}")
     return None
@@ -267,10 +251,7 @@ async def _push_appointment_to_1c(appt: AppointmentRequest, user: User) -> str |
                 dt_start = dt_start.replace(hour=h, minute=m, second=0, microsecond=0)
             except Exception:
                 pass
-        dt_end = dt_start.replace(
-            hour=min(dt_start.hour + 0, 23),
-            minute=(dt_start.minute + 30) % 60,
-        )
+        dt_end = dt_start + timedelta(minutes=30)
 
         payload = {
             "Клиент_Key": client_key or null_guid,
@@ -303,9 +284,9 @@ async def _push_appointment_to_1c(appt: AppointmentRequest, user: User) -> str |
 
         async with httpx.AsyncClient(timeout=15.0) as http:
             resp = await http.post(
-                _odata_url("Document_%D0%97%D0%B0%D1%8F%D0%B2%D0%BA%D0%B0"),
+                odata_url("Document_%D0%97%D0%B0%D1%8F%D0%B2%D0%BA%D0%B0"),
                 json=payload,
-                auth=_odata_auth(),
+                auth=odata_auth(),
                 headers={"Content-Type": "application/json"},
                 params={"$format": "json"},
             )

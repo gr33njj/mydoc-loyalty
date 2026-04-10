@@ -1,16 +1,14 @@
 """
-Синхронизация сертификатов с 1С:УМЦ.
+Синхронизация сертификатов с 1С:УМЦ через OData API.
 
 Протокол:
   1С → наш сервис: POST /api/integrations/1c/certificate  (вебхук от 1С)
-  Наш сервис → 1С: при покупке сертификата и частичном погашении
-                   вызываем 1С HTTP-сервис через VPN.
+  Наш сервис → 1С: при покупке/погашении сертификата
+                   обращаемся к OData API через VPN.
 
-HTTP-сервис 1С ожидается на:
-  GET  /hs/loyalty/v1/certificates           — список сертификатов
-  GET  /hs/loyalty/v1/certificates/{code}    — одиночный сертификат
-  POST /hs/loyalty/v1/certificates           — создать/обновить сертификат
-  POST /hs/loyalty/v1/certificates/redeem    — погасить сертификат
+OData-сущность: Catalog_КартыСкидок
+  GET  /odata/standard.odata/Catalog_КартыСкидок  — список карт
+  POST /odata/standard.odata/Catalog_КартыСкидок  — создать/обновить карту
 """
 from __future__ import annotations
 
@@ -25,6 +23,7 @@ from sqlalchemy.orm import Session
 from config import settings
 from database import get_db
 from models import Certificate, CertificateRedemption, CertificateStatus, User
+from onec_utils import odata_auth, odata_url
 
 logger = logging.getLogger(__name__)
 
@@ -66,14 +65,6 @@ def _verify_token(x_webhook_token: Optional[str] = Header(None)):
     return x_webhook_token
 
 
-def _odata_url(entity: str) -> str:
-    base = (settings.ONEC_API_URL or "").rstrip("/")
-    return f"{base}/odata/standard.odata/{entity}"
-
-
-def _auth() -> tuple[str, str]:
-    return (settings.ONEC_USERNAME or "", settings.ONEC_PASSWORD or "")
-
 
 async def push_certificate_to_1c(cert: Certificate, db: Session) -> bool:
     """
@@ -97,9 +88,9 @@ async def push_certificate_to_1c(cert: Certificate, db: Session) -> bool:
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
-                _odata_url("Catalog_%D0%9A%D0%B0%D1%80%D1%82%D1%8B%D0%A1%D0%BA%D0%B8%D0%B4%D0%BE%D0%BA"),
+                odata_url("Catalog_%D0%9A%D0%B0%D1%80%D1%82%D1%8B%D0%A1%D0%BA%D0%B8%D0%B4%D0%BE%D0%BA"),
                 json=payload,
-                auth=_auth(),
+                auth=odata_auth(),
                 headers={"Content-Type": "application/json"},
                 params={"$format": "json"},
             )
@@ -129,13 +120,13 @@ async def sync_certificate_from_1c(code: str, db: Session) -> Certificate | None
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.get(
-                _odata_url("Catalog_%D0%9A%D0%B0%D1%80%D1%82%D1%8B%D0%A1%D0%BA%D0%B8%D0%B4%D0%BE%D0%BA"),
+                odata_url("Catalog_%D0%9A%D0%B0%D1%80%D1%82%D1%8B%D0%A1%D0%BA%D0%B8%D0%B4%D0%BE%D0%BA"),
                 params={
                     "$filter": f"Description eq '{code}' and DeletionMark eq false",
                     "$format": "json",
                     "$top": "1",
                 },
-                auth=_auth(),
+                auth=odata_auth(),
             )
             resp.raise_for_status()
             vals = resp.json().get("value", [])

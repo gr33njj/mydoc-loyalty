@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -219,7 +219,7 @@ export default function Appointment() {
   minDate.setDate(minDate.getDate() + 1);
   const minDateStr = minDate.toISOString().split('T')[0];
 
-  const groupedServices = groupBy(services, 'category');
+  const groupedServices = useMemo(() => groupBy(services, 'category'), [services]);
 
   // ==================== РЕНДЕР ====================
 
@@ -466,8 +466,6 @@ export default function Appointment() {
 // Шаг 0 — Выбор специалиста или услуги
 // =====================================================================
 function Step0({ selectionMode, setSelectionMode, doctors, groupedServices, form, onSelectDoctor, onSelectService }) {
-  const theme = useTheme();
-
   return (
     <Box>
       <Tabs
