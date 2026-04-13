@@ -6,7 +6,7 @@ import {
   CardContent,
   Button,
   TextField,
-  MenuItem,
+
   Stepper,
   Step,
   StepLabel,
@@ -43,8 +43,6 @@ import {
 } from '@mui/icons-material';
 import axios from 'axios';
 import Layout from '../components/Layout';
-
-const API = process.env.REACT_APP_API_URL || '/api';
 
 // Временные слоты
 const TIME_SLOTS = [
@@ -117,8 +115,8 @@ export default function Appointment() {
   // Загрузка справочников
   useEffect(() => {
     Promise.all([
-      axios.get(`${API}/appointments/doctors`),
-      axios.get(`${API}/appointments/services`),
+      axios.get(`/appointments/doctors`),
+      axios.get(`/appointments/services`),
     ])
       .then(([dRes, sRes]) => {
         setDoctors(dRes.data);
@@ -132,7 +130,7 @@ export default function Appointment() {
   useEffect(() => {
     if (tab === 1) {
       setHistoryLoading(true);
-      axios.get(`${API}/appointments/my`)
+      axios.get(`/appointments/my`)
         .then(r => setHistory(r.data))
         .catch(() => {})
         .finally(() => setHistoryLoading(false));
@@ -175,7 +173,7 @@ export default function Appointment() {
     setSubmitting(true);
     setError('');
     try {
-      await axios.post(`${API}/appointments/request`, {
+      await axios.post(`/appointments/request`, {
         doctor_id: form.doctor_id || undefined,
         doctor_name: form.doctor_name || undefined,
         service_id: form.service_id || undefined,
@@ -208,7 +206,7 @@ export default function Appointment() {
   // --- Отмена заявки ---
   const handleCancel = async (id) => {
     try {
-      await axios.delete(`${API}/appointments/request/${id}`);
+      await axios.delete(`/appointments/request/${id}`);
       setHistory(h => h.map(a => a.id === id ? { ...a, status: 'cancelled' } : a));
     } catch {}
     setCancelDialog(null);
