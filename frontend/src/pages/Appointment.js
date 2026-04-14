@@ -256,7 +256,7 @@ export default function Appointment() {
 
       {/* ===================== ВКЛАДКА: НОВАЯ ЗАПИСЬ ===================== */}
       {tab === 0 && (
-        <Card>
+        <Card sx={{ overflow: 'visible' }}>
           <CardContent sx={{ p: isMobile ? 2 : 3 }}>
             {success ? (
               <SuccessScreen onReset={handleReset} onHistory={() => setTab(1)} />
@@ -280,48 +280,46 @@ export default function Appointment() {
                   </Alert>
                 )}
 
-                {/* === ШАГ 0: Выбор врача / услуги === */}
-                {step === 0 && (
-                  <Step0
-                    selectionMode={selectionMode}
-                    setSelectionMode={setSelectionMode}
-                    doctors={doctors}
-                    groupedServices={groupedServices}
-                    form={form}
-                    onSelectDoctor={handleSelectDoctor}
-                    onSelectService={handleSelectService}
-                  />
-                )}
-
-                {/* === ШАГ 1: Дата и время === */}
-                {step === 1 && (
-                  <Step1
-                    form={form}
-                    setForm={setForm}
-                    minDate={minDateStr}
-                  />
-                )}
-
-                {/* === ШАГ 2: Подтверждение === */}
-                {step === 2 && (
-                  <Step2
-                    form={form}
-                    setForm={setForm}
-                    selectionMode={selectionMode}
-                  />
-                )}
-
-                {/* Кнопки навигации — sticky, всегда видны */}
+                {/* Контент шага — ограниченная высота со своим скроллом */}
                 <Box sx={{
-                  position: 'sticky',
-                  bottom: { xs: 65, md: 0 }, // учитываем мобильный bottom nav
-                  bgcolor: 'background.paper',
+                  overflowY: 'auto',
+                  maxHeight: { xs: 'calc(100vh - 320px)', md: '55vh' },
+                  minHeight: 120,
+                  pr: 0.5,
+                }}>
+                  {step === 0 && (
+                    <Step0
+                      selectionMode={selectionMode}
+                      setSelectionMode={setSelectionMode}
+                      doctors={doctors}
+                      groupedServices={groupedServices}
+                      form={form}
+                      onSelectDoctor={handleSelectDoctor}
+                      onSelectService={handleSelectService}
+                    />
+                  )}
+                  {step === 1 && (
+                    <Step1
+                      form={form}
+                      setForm={setForm}
+                      minDate={minDateStr}
+                    />
+                  )}
+                  {step === 2 && (
+                    <Step2
+                      form={form}
+                      setForm={setForm}
+                      selectionMode={selectionMode}
+                    />
+                  )}
+                </Box>
+
+                {/* Кнопки навигации — всегда видны под списком */}
+                <Box sx={{
                   borderTop: '1px solid',
                   borderColor: 'divider',
                   pt: 2,
-                  pb: 1,
                   mt: 2,
-                  zIndex: 10,
                   display: 'flex',
                   justifyContent: 'space-between',
                 }}>
