@@ -104,7 +104,7 @@ export default function SSORedirect() {
     >
       <CircularProgress size={60} sx={{ color: 'white', mb: 3 }} />
       <Typography variant="h6" sx={{ color: 'white', mb: 1 }}>
-        Авторизация через Bitrix...
+        Авторизация через МД-ID
       </Typography>
       <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
         Подождите, мы проверяем ваши данные

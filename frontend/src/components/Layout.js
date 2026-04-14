@@ -142,7 +142,7 @@ export default function Layout({ children }) {
         >
           <Container maxWidth="lg">
             <Typography variant="body2">
-              © 2025 it-mydoc.ru — Все права защищены
+              © 2026 it-mydoc.ru — Все права защищены
             </Typography>
           </Container>
         </Box>

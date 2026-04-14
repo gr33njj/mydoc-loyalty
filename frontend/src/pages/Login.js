@@ -208,6 +208,9 @@ export default function Login() {
                   🎁 Подарочные сертификаты
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
+                  📅 Онлайн-запись к специалисту
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
                   👥 Реферальная программа
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -221,7 +224,7 @@ export default function Login() {
         {/* Футер */}
         <Box sx={{ textAlign: 'center', mt: 3 }}>
           <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
-            © 2025 Медицинский центр «Мой Доктор»
+            © 2026 Медицинский центр «Мой Доктор»
           </Typography>
         </Box>
       </Container>

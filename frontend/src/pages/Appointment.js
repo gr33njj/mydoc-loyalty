@@ -311,8 +311,20 @@ export default function Appointment() {
                   />
                 )}
 
-                {/* Кнопки навигации */}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+                {/* Кнопки навигации — sticky, всегда видны */}
+                <Box sx={{
+                  position: 'sticky',
+                  bottom: { xs: 65, md: 0 }, // учитываем мобильный bottom nav
+                  bgcolor: 'background.paper',
+                  borderTop: '1px solid',
+                  borderColor: 'divider',
+                  pt: 2,
+                  pb: 1,
+                  mt: 2,
+                  zIndex: 10,
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                }}>
                   <Button
                     startIcon={<ArrowBackIcon />}
                     onClick={handleBack}
